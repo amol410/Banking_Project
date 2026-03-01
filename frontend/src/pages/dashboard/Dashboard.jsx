@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllAccounts, createAccount } from '../../api/accounts';
+import { getAllAccounts, createAccount, searchByName } from '../../api/accounts';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency, formatDateShort, getErrorMessage } from '../../utils/format';
 import Navbar from '../../components/Navbar';
@@ -9,23 +9,32 @@ import Modal from '../../components/Modal';
 import Spinner from '../../components/Spinner';
 import {
   Wallet, Users, TrendingUp, Plus, Eye,
-  CreditCard, PiggyBank, RefreshCw, Search
+  CreditCard, PiggyBank, RefreshCw, Search, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
-  const { user }           = useAuth();
-  const navigate           = useNavigate();
-  const [accounts, setAccounts]   = useState([]);
-  const [filtered, setFiltered]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState('');
+  const { user }    = useAuth();
+  const navigate    = useNavigate();
+
+  const [accounts, setAccounts]     = useState([]);
+  const [filtered, setFiltered]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+
+  // search state
+  const [search, setSearch]         = useState('');
+  const [searching, setSearching]   = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(false); // true = showing backend search results
+
+  // modals
   const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating]   = useState(false);
-  const [newAcc, setNewAcc]       = useState({ accountHolderName: '', accountType: 'SAVINGS' });
+  const [creating, setCreating]     = useState(false);
+  const [newAcc, setNewAcc]         = useState({ accountHolderName: '', accountType: 'SAVINGS' });
 
   const fetchAccounts = async () => {
     setLoading(true);
+    setIsSearchMode(false);
+    setSearch('');
     try {
       const { data } = await getAllAccounts();
       setAccounts(data);
@@ -39,7 +48,9 @@ export default function Dashboard() {
 
   useEffect(() => { fetchAccounts(); }, []);
 
+  // client-side filter while typing (instant)
   useEffect(() => {
+    if (isSearchMode) return; // don't filter over search results
     const q = search.toLowerCase();
     setFiltered(
       accounts.filter(a =>
@@ -48,7 +59,30 @@ export default function Dashboard() {
         a.accountType.toLowerCase().includes(q)
       )
     );
-  }, [search, accounts]);
+  }, [search, accounts, isSearchMode]);
+
+  // backend search by name (Group 2)
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!search.trim()) { fetchAccounts(); return; }
+    setSearching(true);
+    setIsSearchMode(true);
+    try {
+      const { data } = await searchByName(search.trim());
+      setFiltered(data);
+      if (data.length === 0) toast('No accounts found for that name', { icon: '🔍' });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearch('');
+    setIsSearchMode(false);
+    setFiltered(accounts);
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -68,9 +102,9 @@ export default function Dashboard() {
   };
 
   // Stats
-  const totalBalance   = accounts.reduce((s, a) => s + (a.balance || 0), 0);
-  const activeCount    = accounts.filter(a => a.status === 'ACTIVE').length;
-  const savingsCount   = accounts.filter(a => a.accountType === 'SAVINGS').length;
+  const totalBalance = accounts.reduce((s, a) => s + (a.balance || 0), 0);
+  const activeCount  = accounts.filter(a => a.status === 'ACTIVE').length;
+  const savingsCount = accounts.filter(a => a.accountType === 'SAVINGS').length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -105,37 +139,59 @@ export default function Dashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard icon={Users}     label="Total Accounts" value={accounts.length}         color="blue"    />
-          <StatCard icon={TrendingUp} label="Active Accounts" value={activeCount}            color="emerald" />
-          <StatCard icon={Wallet}    label="Total Balance"   value={formatCurrency(totalBalance)} color="violet" />
-          <StatCard icon={PiggyBank} label="Savings Accounts" value={savingsCount}           color="amber"   />
+          <StatCard icon={Users}      label="Total Accounts"   value={accounts.length}              color="blue"    />
+          <StatCard icon={TrendingUp} label="Active Accounts"  value={activeCount}                  color="emerald" />
+          <StatCard icon={Wallet}     label="Total Balance"    value={formatCurrency(totalBalance)}  color="violet"  />
+          <StatCard icon={PiggyBank}  label="Savings Accounts" value={savingsCount}                  color="amber"   />
         </div>
 
         {/* Accounts Table */}
         <div className="card">
-          {/* Table Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
-            <h2 className="text-lg font-bold text-gray-900">All Accounts</h2>
-            <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search accounts..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="input-field pl-9 w-48 sm:w-64"
-                />
-              </div>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="btn-primary sm:hidden"
-              >
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">All Accounts</h2>
+              {isSearchMode && (
+                <p className="text-xs text-blue-600 font-medium mt-0.5">
+                  Showing {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{search}"
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Search form — calls backend searchByName on submit */}
+              <form onSubmit={handleSearch} className="flex items-center gap-1">
+                <div className="relative">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by name..."
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); if (!e.target.value) clearSearch(); }}
+                    className="input-field pl-9 w-44 sm:w-56"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={searching}
+                  className="btn-secondary !py-2 !px-3"
+                  title="Search by name (backend)"
+                >
+                  {searching ? <Spinner size="sm" color="gray" /> : <Search size={14} />}
+                </button>
+              </form>
+
+              <button onClick={() => setShowCreate(true)} className="btn-primary">
                 <Plus size={15} />
-              </button>
-              <button onClick={() => setShowCreate(true)} className="btn-primary hidden sm:flex">
-                <Plus size={15} /> New Account
+                <span className="hidden sm:inline">New Account</span>
               </button>
             </div>
           </div>
@@ -150,9 +206,13 @@ export default function Dashboard() {
                 <CreditCard size={28} className="text-gray-400" />
               </div>
               <p className="text-gray-500 font-medium">
-                {search ? 'No accounts match your search' : 'No accounts yet'}
+                {search ? `No accounts found for "${search}"` : 'No accounts yet'}
               </p>
-              {!search && (
+              {search ? (
+                <button onClick={clearSearch} className="btn-secondary mt-4 mx-auto">
+                  <X size={14} /> Clear Search
+                </button>
+              ) : (
                 <button onClick={() => setShowCreate(true)} className="btn-primary mt-4 mx-auto">
                   <Plus size={15} /> Create First Account
                 </button>
@@ -178,7 +238,9 @@ export default function Dashboard() {
                       <td className="py-3.5 pr-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shadow-sm
-                            ${acc.accountType === 'SAVINGS' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-violet-500 to-violet-600'}`}>
+                            ${acc.accountType === 'SAVINGS'
+                              ? 'bg-gradient-to-br from-blue-500 to-blue-600'
+                              : 'bg-gradient-to-br from-violet-500 to-violet-600'}`}>
                             {acc.accountHolderName.charAt(0).toUpperCase()}
                           </div>
                           <div>

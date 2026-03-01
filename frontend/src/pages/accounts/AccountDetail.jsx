@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  getAccount, getBalance, deposit, withdraw, getTransactions
+  getAccount, getBalance, deposit, withdraw, getTransactions,
+  closeAccount, updateName, getMiniStatement
 } from '../../api/accounts';
 import { formatCurrency, formatDate, getErrorMessage } from '../../utils/format';
 import Navbar from '../../components/Navbar';
@@ -9,16 +10,16 @@ import Modal from '../../components/Modal';
 import Spinner from '../../components/Spinner';
 import {
   ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
-  RefreshCw, TrendingUp, TrendingDown, Clock, CreditCard,
-  ChevronLeft, ChevronRight, CircleDollarSign
+  RefreshCw, Clock, ChevronLeft, ChevronRight,
+  CircleDollarSign, Pencil, XCircle, List, Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TxIcon = ({ type }) => {
   const icons = {
     DEPOSIT:    { icon: ArrowDownLeft,  cls: 'text-emerald-600 bg-emerald-50' },
-    WITHDRAWAL: { icon: ArrowUpRight,   cls: 'text-red-500 bg-red-50' },
-    TRANSFER:   { icon: ArrowLeftRight, cls: 'text-blue-600 bg-blue-50' },
+    WITHDRAWAL: { icon: ArrowUpRight,   cls: 'text-red-500    bg-red-50'      },
+    TRANSFER:   { icon: ArrowLeftRight, cls: 'text-blue-600   bg-blue-50'     },
   };
   const { icon: Icon, cls } = icons[type] || icons.TRANSFER;
   return (
@@ -28,18 +29,55 @@ const TxIcon = ({ type }) => {
   );
 };
 
+const TxRow = ({ tx, accountId }) => {
+  const isCredit = tx.type === 'DEPOSIT' ||
+    (tx.type === 'TRANSFER' && tx.toAccount?.accountId === Number(accountId));
+  const isDebit  = tx.type === 'WITHDRAWAL' ||
+    (tx.type === 'TRANSFER' && tx.fromAccount?.accountId === Number(accountId));
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
+      <TxIcon type={tx.type} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-800 truncate">
+          {tx.description || tx.type}
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5">{formatDate(tx.timestamp)}</p>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className={`text-sm font-bold
+          ${isCredit ? 'text-emerald-600' : isDebit ? 'text-red-500' : 'text-gray-700'}`}>
+          {isCredit ? '+' : isDebit ? '-' : ''}{formatCurrency(tx.amount)}
+        </p>
+        <span className={`text-xs font-medium
+          ${tx.type === 'DEPOSIT' ? 'text-emerald-500' :
+            tx.type === 'WITHDRAWAL' ? 'text-red-400' : 'text-blue-500'}`}>
+          {tx.type}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export default function AccountDetail() {
-  const { id }       = useParams();
-  const navigate     = useNavigate();
+  const { id }   = useParams();
+  const navigate = useNavigate();
+
   const [account, setAccount]       = useState(null);
-  const [balance,  setBalance]      = useState(null);
-  const [txPage, setTxPage]         = useState(null); // paginated response
+  const [balance, setBalance]       = useState(null);
+  const [txPage, setTxPage]         = useState(null);
+  const [miniTx, setMiniTx]         = useState([]);
   const [page, setPage]             = useState(0);
+  const [txTab, setTxTab]           = useState('full');  // 'full' | 'mini'
   const [loading, setLoading]       = useState(true);
   const [txLoading, setTxLoading]   = useState(false);
-  const [modal, setModal]           = useState(null); // 'deposit' | 'withdraw'
+  const [miniLoading, setMiniLoading] = useState(false);
+
+  // modals
+  const [modal, setModal]           = useState(null); // 'deposit'|'withdraw'|'updateName'|'close'
   const [amount, setAmount]         = useState('');
   const [desc, setDesc]             = useState('');
+  const [newNameVal, setNewNameVal] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -48,6 +86,7 @@ export default function AccountDetail() {
       const [accRes, balRes] = await Promise.all([getAccount(id), getBalance(id)]);
       setAccount(accRes.data);
       setBalance(balRes.data.balance);
+      setNewNameVal(accRes.data.accountHolderName);
     } catch (err) {
       toast.error(getErrorMessage(err));
       navigate('/dashboard');
@@ -68,14 +107,32 @@ export default function AccountDetail() {
     }
   }, [id]);
 
+  const fetchMini = useCallback(async () => {
+    setMiniLoading(true);
+    try {
+      const { data } = await getMiniStatement(id);
+      setMiniTx(data);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setMiniLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => { fetchAll(); fetchTx(0); }, [fetchAll, fetchTx]);
+
+  // fetch mini when tab is switched to mini
+  useEffect(() => {
+    if (txTab === 'mini' && miniTx.length === 0) fetchMini();
+  }, [txTab, miniTx.length, fetchMini]);
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
     fetchTx(newPage);
   };
 
-  const handleAction = async (e) => {
+  // deposit / withdraw
+  const handleMoneyAction = async (e) => {
     e.preventDefault();
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
       toast.error('Enter a valid amount'); return;
@@ -92,6 +149,39 @@ export default function AccountDetail() {
       }
       setModal(null); setAmount(''); setDesc('');
       fetchAll(); fetchTx(0); setPage(0);
+      if (txTab === 'mini') { setMiniTx([]); fetchMini(); }
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // update name (Group 2)
+  const handleUpdateName = async (e) => {
+    e.preventDefault();
+    if (!newNameVal.trim()) { toast.error('Name cannot be empty'); return; }
+    setSubmitting(true);
+    try {
+      await updateName(id, { accountHolderName: newNameVal.trim() });
+      toast.success('Account name updated!');
+      setModal(null);
+      fetchAll();
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // close account (Group 2)
+  const handleClose = async () => {
+    setSubmitting(true);
+    try {
+      await closeAccount(id);
+      toast.success('Account closed successfully');
+      setModal(null);
+      fetchAll();
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -108,9 +198,10 @@ export default function AccountDetail() {
     );
   }
 
-  const txList = txPage?.content || [];
-  const totalPages = txPage?.totalPages || 0;
+  const txList      = txPage?.content || [];
+  const totalPages  = txPage?.totalPages || 0;
   const totalElements = txPage?.totalElements || 0;
+  const isActive    = account?.status === 'ACTIVE';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -144,121 +235,168 @@ export default function AccountDetail() {
               <p className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-1">Balance</p>
               <p className="text-3xl font-bold">{formatCurrency(balance ?? account?.balance)}</p>
               <span className={`inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold
-                ${account?.status === 'ACTIVE' ? 'bg-white/20 text-white' : 'bg-red-400/30 text-red-200'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${account?.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                ${isActive ? 'bg-white/20 text-white' : 'bg-red-400/30 text-red-200'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-red-400'}`} />
                 {account?.status}
               </span>
             </div>
           </div>
 
-          {/* Actions */}
-          {account?.status === 'ACTIVE' && (
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => { setModal('deposit'); setAmount(''); setDesc(''); }}
-                className="flex-1 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
-              >
-                <ArrowDownLeft size={16} /> Deposit
-              </button>
-              <button
-                onClick={() => { setModal('withdraw'); setAmount(''); setDesc(''); }}
-                className="flex-1 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
-              >
-                <ArrowUpRight size={16} /> Withdraw
-              </button>
-              <button
-                onClick={() => navigate('/transfer')}
-                className="flex-1 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
-              >
-                <ArrowLeftRight size={16} /> Transfer
-              </button>
-            </div>
-          )}
-        </div>
+          {/* Action buttons */}
+          <div className="mt-6 space-y-3">
+            {/* Money actions — only when active */}
+            {isActive && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setModal('deposit'); setAmount(''); setDesc(''); }}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
+                >
+                  <ArrowDownLeft size={16} /> Deposit
+                </button>
+                <button
+                  onClick={() => { setModal('withdraw'); setAmount(''); setDesc(''); }}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
+                >
+                  <ArrowUpRight size={16} /> Withdraw
+                </button>
+                <button
+                  onClick={() => navigate('/transfer')}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-sm font-semibold py-2.5 rounded-xl transition-all"
+                >
+                  <ArrowLeftRight size={16} /> Transfer
+                </button>
+              </div>
+            )}
 
-        {/* Transaction History */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Transaction History</h3>
-              {totalElements > 0 && (
-                <p className="text-xs text-gray-400 mt-0.5">{totalElements} total transactions</p>
+            {/* Management actions — Group 2 */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setNewNameVal(account?.accountHolderName); setModal('updateName'); }}
+                className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 text-xs font-semibold py-2 rounded-xl transition-all"
+              >
+                <Pencil size={13} /> Edit Name
+              </button>
+              {isActive && (
+                <button
+                  onClick={() => setModal('close')}
+                  className="flex-1 flex items-center justify-center gap-2 bg-red-500/20 hover:bg-red-500/35 border border-red-400/30 text-red-200 text-xs font-semibold py-2 rounded-xl transition-all"
+                >
+                  <XCircle size={13} /> Close Account
+                </button>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Transaction History with tabs */}
+        <div className="card">
+          {/* Tab header */}
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+              <button
+                onClick={() => setTxTab('full')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                  ${txTab === 'full' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <List size={14} />
+                All Transactions
+                {totalElements > 0 && (
+                  <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                    {totalElements}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setTxTab('mini')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                  ${txTab === 'mini' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <Zap size={14} />
+                Mini Statement
+              </button>
+            </div>
+
             <button
-              onClick={() => { fetchAll(); fetchTx(page); }}
+              onClick={() => {
+                if (txTab === 'full') { fetchAll(); fetchTx(page); }
+                else { setMiniTx([]); fetchMini(); }
+              }}
               className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-all"
             >
               <RefreshCw size={13} /> Refresh
             </button>
           </div>
 
-          {txLoading ? (
-            <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
-          ) : txList.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <Clock size={24} className="text-gray-400" />
-              </div>
-              <p className="text-gray-500 font-medium text-sm">No transactions yet</p>
-              <p className="text-gray-400 text-xs mt-1">Deposits and withdrawals will appear here</p>
-            </div>
-          ) : (
+          {/* Full transaction history */}
+          {txTab === 'full' && (
             <>
-              <div className="space-y-1">
-                {txList.map((tx) => {
-                  const isCredit = tx.type === 'DEPOSIT' ||
-                    (tx.type === 'TRANSFER' && tx.toAccount?.accountId === Number(id));
-                  const isDebit  = tx.type === 'WITHDRAWAL' ||
-                    (tx.type === 'TRANSFER' && tx.fromAccount?.accountId === Number(id));
-
-                  return (
-                    <div key={tx.transactionId}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
-                      <TxIcon type={tx.type} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">
-                          {tx.description || tx.type}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatDate(tx.timestamp)}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className={`text-sm font-bold ${isCredit ? 'text-emerald-600' : isDebit ? 'text-red-500' : 'text-gray-700'}`}>
-                          {isCredit ? '+' : isDebit ? '-' : ''}{formatCurrency(tx.amount)}
-                        </p>
-                        <span className={`text-xs font-medium
-                          ${tx.type === 'DEPOSIT' ? 'text-emerald-500' :
-                            tx.type === 'WITHDRAWAL' ? 'text-red-400' : 'text-blue-500'}`}>
-                          {tx.type}
-                        </span>
+              {txLoading ? (
+                <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
+              ) : txList.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Clock size={24} className="text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 font-medium text-sm">No transactions yet</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    {txList.map((tx) => (
+                      <TxRow key={tx.transactionId} tx={tx} accountId={id} />
+                    ))}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100">
+                      <p className="text-xs text-gray-400">Page {page + 1} of {totalPages}</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handlePageChange(page - 1)}
+                          disabled={page === 0}
+                          className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          <ChevronLeft size={15} />
+                        </button>
+                        <button
+                          onClick={() => handlePageChange(page + 1)}
+                          disabled={page >= totalPages - 1}
+                          className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          <ChevronRight size={15} />
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100">
-                  <p className="text-xs text-gray-400">
-                    Page {page + 1} of {totalPages}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handlePageChange(page - 1)}
-                      disabled={page === 0}
-                      className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                    >
-                      <ChevronLeft size={15} />
-                    </button>
-                    <button
-                      onClick={() => handlePageChange(page + 1)}
-                      disabled={page >= totalPages - 1}
-                      className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                    >
-                      <ChevronRight size={15} />
-                    </button>
+          {/* Mini Statement — last 5 (Group 2) */}
+          {txTab === 'mini' && (
+            <>
+              {miniLoading ? (
+                <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
+              ) : miniTx.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <Zap size={24} className="text-gray-400" />
                   </div>
+                  <p className="text-gray-500 font-medium text-sm">No transactions yet</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-gray-500 font-medium">
+                      Last {miniTx.length} transaction{miniTx.length !== 1 ? 's' : ''}
+                    </p>
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                      Quick View
+                    </span>
+                  </div>
+                  {miniTx.map((tx) => (
+                    <TxRow key={tx.transactionId} tx={tx} accountId={id} />
+                  ))}
                 </div>
               )}
             </>
@@ -268,12 +406,11 @@ export default function AccountDetail() {
 
       {/* Deposit / Withdraw Modal */}
       <Modal
-        isOpen={!!modal}
+        isOpen={modal === 'deposit' || modal === 'withdraw'}
         onClose={() => setModal(null)}
         title={modal === 'deposit' ? 'Deposit Funds' : 'Withdraw Funds'}
       >
-        <form onSubmit={handleAction} className="space-y-4">
-          {/* Amount */}
+        <form onSubmit={handleMoneyAction} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
               Amount (₹)
@@ -281,9 +418,7 @@ export default function AccountDetail() {
             <div className="relative">
               <CircleDollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                type="number"
-                min="0.01"
-                step="0.01"
+                type="number" min="0.01" step="0.01"
                 className="input-field pl-9"
                 placeholder="0.00"
                 value={amount}
@@ -292,15 +427,12 @@ export default function AccountDetail() {
               />
             </div>
           </div>
-
-          {/* Quick amounts */}
           <div>
             <p className="text-xs text-gray-500 mb-2">Quick select</p>
             <div className="grid grid-cols-4 gap-2">
               {[500, 1000, 5000, 10000].map(v => (
                 <button
-                  key={v}
-                  type="button"
+                  key={v} type="button"
                   onClick={() => setAmount(String(v))}
                   className={`text-xs font-semibold py-2 px-2 rounded-lg border transition-all
                     ${Number(amount) === v
@@ -312,48 +444,95 @@ export default function AccountDetail() {
               ))}
             </div>
           </div>
-
-          {/* Description */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
               Description <span className="text-gray-400 normal-case font-normal">(optional)</span>
             </label>
             <input
-              type="text"
-              className="input-field"
+              type="text" className="input-field"
               placeholder={modal === 'deposit' ? 'e.g. Salary credit' : 'e.g. ATM withdrawal'}
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
             />
           </div>
-
-          {/* Info */}
           {modal === 'withdraw' && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
               <span className="text-amber-500 text-lg leading-none">⚠</span>
               <p className="text-xs text-amber-700">
-                Daily withdrawal limit: <strong>₹10,000</strong>. Current balance: <strong>{formatCurrency(balance)}</strong>
+                Daily withdrawal limit: <strong>₹10,000</strong>. Balance: <strong>{formatCurrency(balance)}</strong>
               </p>
             </div>
           )}
-
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className={`flex-1 ${modal === 'deposit' ? 'btn-success' : 'btn-danger'}`}
-            >
+            <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancel</button>
+            <button type="submit" disabled={submitting}
+              className={`flex-1 ${modal === 'deposit' ? 'btn-success' : 'btn-danger'}`}>
               {submitting ? <Spinner size="sm" color="white" /> :
                 modal === 'deposit'
                   ? <><ArrowDownLeft size={15} /> Deposit</>
-                  : <><ArrowUpRight size={15} /> Withdraw</>
-              }
+                  : <><ArrowUpRight size={15} /> Withdraw</>}
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Update Name Modal — Group 2 */}
+      <Modal isOpen={modal === 'updateName'} onClose={() => setModal(null)} title="Update Account Name">
+        <form onSubmit={handleUpdateName} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+              New Account Holder Name
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Enter new name"
+              value={newNameVal}
+              onChange={(e) => setNewNameVal(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={() => setModal(null)} className="btn-secondary flex-1">Cancel</button>
+            <button type="submit" disabled={submitting} className="btn-primary flex-1">
+              {submitting ? <Spinner size="sm" color="white" /> : <><Pencil size={14} /> Update Name</>}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Close Account Confirmation Modal — Group 2 */}
+      <Modal isOpen={modal === 'close'} onClose={() => setModal(null)} title="Close Account">
+        <div className="space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <XCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-800">Are you sure?</p>
+                <p className="text-xs text-red-600 mt-1">
+                  Closing <strong>{account?.accountHolderName}</strong>'s account will set it to
+                  INACTIVE. Deposits, withdrawals and transfers will be blocked.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Account</span>
+              <span className="font-semibold">{account?.accountNumber}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Current Balance</span>
+              <span className="font-semibold">{formatCurrency(balance)}</span>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setModal(null)} className="btn-secondary flex-1">Cancel</button>
+            <button onClick={handleClose} disabled={submitting} className="btn-danger flex-1">
+              {submitting ? <Spinner size="sm" color="white" /> : <><XCircle size={14} /> Close Account</>}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
