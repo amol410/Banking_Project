@@ -2,36 +2,54 @@
 
 import com.banking.studentbank.dto.AuthResponse;
 import com.banking.studentbank.dto.LoginRequest;
+import com.banking.studentbank.dto.RefreshTokenRequest;
 import com.banking.studentbank.dto.RegisterRequest;
 import com.banking.studentbank.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping(&quot;/auth&quot;)
 @RequiredArgsConstructor
-@Tag(name = &quot;Authentication&quot;, description = &quot;User registration and login endpoints&quot;)
+@Tag(name = &quot;Authentication&quot;, description = &quot;User registration, login, token refresh and logout&quot;)
 public class AuthController {
 
     private final AuthService authService;
 
     @PostMapping(&quot;/register&quot;)
-    @Operation(summary = &quot;Register a new user&quot;, description = &quot;Register a new user with username, password, email, and role&quot;)
+    @Operation(summary = &quot;Register a new user&quot;)
     public ResponseEntity&lt;AuthResponse&gt; register(@Valid @RequestBody RegisterRequest request) {
-<span class="fc" id="L26">        AuthResponse response = authService.register(request);</span>
-<span class="fc" id="L27">        return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+<span class="fc" id="L32">        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));</span>
     }
 
     @PostMapping(&quot;/login&quot;)
-    @Operation(summary = &quot;Login user&quot;, description = &quot;Authenticate user and receive JWT token&quot;)
+    @Operation(summary = &quot;Login and get JWT + Refresh token&quot;)
     public ResponseEntity&lt;AuthResponse&gt; login(@Valid @RequestBody LoginRequest request) {
-<span class="fc" id="L33">        AuthResponse response = authService.login(request);</span>
-<span class="fc" id="L34">        return ResponseEntity.ok(response);</span>
+<span class="fc" id="L38">        return ResponseEntity.ok(authService.login(request));</span>
+    }
+
+    @PostMapping(&quot;/refresh-token&quot;)
+    @Operation(summary = &quot;Get new access token using refresh token&quot;)
+    public ResponseEntity&lt;AuthResponse&gt; refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+<span class="nc" id="L44">        return ResponseEntity.ok(authService.refreshToken(request));</span>
+    }
+
+    @PostMapping(&quot;/logout&quot;)
+    @SecurityRequirement(name = &quot;bearerAuth&quot;)
+    @Operation(summary = &quot;Logout and invalidate refresh token&quot;)
+    public ResponseEntity&lt;Map&lt;String, String&gt;&gt; logout(@AuthenticationPrincipal UserDetails userDetails) {
+<span class="nc" id="L51">        String message = authService.logout(userDetails.getUsername());</span>
+<span class="nc" id="L52">        return ResponseEntity.ok(Map.of(&quot;message&quot;, message));</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

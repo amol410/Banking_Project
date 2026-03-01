@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmailService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Student Bank Account Management</a> &gt; <a href="index.source.html" class="el_package">com.banking.studentbank.service</a> &gt; <span class="el_source">EmailService.java</span></div><h1>EmailService.java</h1><pre class="source lang-java linenums">package com.banking.studentbank.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+
+<span class="fc" id="L12">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class EmailService {
+
+    private final JavaMailSender mailSender;
+
+    @Value(&quot;${app.mail.enabled:false}&quot;)
+    private boolean mailEnabled;
+
+    @Value(&quot;${spring.mail.username:noreply@bank.com}&quot;)
+    private String fromEmail;
+
+    public void sendDepositNotification(String toEmail, String accountNumber, BigDecimal amount, BigDecimal balance) {
+<span class="nc" id="L26">        String subject = &quot;Deposit Successful - &quot; + accountNumber;</span>
+<span class="nc" id="L27">        String body = String.format(</span>
+            &quot;Dear Customer,\n\nAmount of Rs. %.2f has been credited to your account %s.\nAvailable Balance: Rs. %.2f\n\nThank you for banking with us.&quot;,
+            amount, accountNumber, balance);
+<span class="nc" id="L30">        sendEmail(toEmail, subject, body);</span>
+<span class="nc" id="L31">    }</span>
+
+    public void sendWithdrawNotification(String toEmail, String accountNumber, BigDecimal amount, BigDecimal balance) {
+<span class="nc" id="L34">        String subject = &quot;Withdrawal Successful - &quot; + accountNumber;</span>
+<span class="nc" id="L35">        String body = String.format(</span>
+            &quot;Dear Customer,\n\nAmount of Rs. %.2f has been debited from your account %s.\nAvailable Balance: Rs. %.2f\n\nThank you for banking with us.&quot;,
+            amount, accountNumber, balance);
+<span class="nc" id="L38">        sendEmail(toEmail, subject, body);</span>
+<span class="nc" id="L39">    }</span>
+
+    public void sendTransferNotification(String toEmail, String fromAccount, String toAccount, BigDecimal amount) {
+<span class="nc" id="L42">        String subject = &quot;Transfer Successful - &quot; + fromAccount;</span>
+<span class="nc" id="L43">        String body = String.format(</span>
+            &quot;Dear Customer,\n\nAmount of Rs. %.2f has been transferred from account %s to account %s.\n\nThank you for banking with us.&quot;,
+            amount, fromAccount, toAccount);
+<span class="nc" id="L46">        sendEmail(toEmail, subject, body);</span>
+<span class="nc" id="L47">    }</span>
+
+    public void sendWelcomeEmail(String toEmail, String username) {
+<span class="nc" id="L50">        String subject = &quot;Welcome to Student Bank!&quot;;</span>
+<span class="nc" id="L51">        String body = String.format(</span>
+            &quot;Dear %s,\n\nWelcome to Student Bank! Your account has been created successfully.\n\nThank you for choosing us.&quot;,
+            username);
+<span class="nc" id="L54">        sendEmail(toEmail, subject, body);</span>
+<span class="nc" id="L55">    }</span>
+
+    public void sendInterestCreditNotification(String toEmail, String accountNumber, BigDecimal interest, BigDecimal balance) {
+<span class="nc" id="L58">        String subject = &quot;Monthly Interest Credited - &quot; + accountNumber;</span>
+<span class="nc" id="L59">        String body = String.format(</span>
+            &quot;Dear Customer,\n\nMonthly interest of Rs. %.2f has been credited to your account %s.\nNew Balance: Rs. %.2f\n\nThank you for banking with us.&quot;,
+            interest, accountNumber, balance);
+<span class="nc" id="L62">        sendEmail(toEmail, subject, body);</span>
+<span class="nc" id="L63">    }</span>
+
+    private void sendEmail(String to, String subject, String body) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (!mailEnabled) {</span>
+<span class="nc" id="L67">            log.info(&quot;Email disabled. Would have sent to: {} | Subject: {}&quot;, to, subject);</span>
+<span class="nc" id="L68">            return;</span>
+        }
+        try {
+<span class="nc" id="L71">            SimpleMailMessage message = new SimpleMailMessage();</span>
+<span class="nc" id="L72">            message.setFrom(fromEmail);</span>
+<span class="nc" id="L73">            message.setTo(to);</span>
+<span class="nc" id="L74">            message.setSubject(subject);</span>
+<span class="nc" id="L75">            message.setText(body);</span>
+<span class="nc" id="L76">            mailSender.send(message);</span>
+<span class="nc" id="L77">            log.info(&quot;Email sent to: {}&quot;, to);</span>
+<span class="nc" id="L78">        } catch (Exception e) {</span>
+<span class="nc" id="L79">            log.error(&quot;Failed to send email to {}: {}&quot;, to, e.getMessage());</span>
+<span class="nc" id="L80">        }</span>
+<span class="nc" id="L81">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

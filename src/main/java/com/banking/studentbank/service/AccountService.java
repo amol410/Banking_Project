@@ -234,6 +234,51 @@ public class AccountService {
                 .collect(Collectors.toList());
     }
 
+    // Group 4 Feature 1: Global Search
+    public List<AccountResponse> globalSearch(String keyword) {
+        return bankAccountRepository.globalSearch(keyword)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Group 4 Feature 2: Soft Delete
+    public Map<String, String> softDeleteAccount(Long accountId) {
+        BankAccount account = bankAccountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+
+        if (account.isDeleted()) {
+            throw new InvalidAccountOperationException("Account is already deleted");
+        }
+
+        account.setDeleted(true);
+        account.setDeletedAt(LocalDateTime.now());
+        account.setStatus(AccountStatus.INACTIVE);
+        bankAccountRepository.save(account);
+
+        Map<String, String> result = new java.util.LinkedHashMap<>();
+        result.put("message", "Account soft deleted successfully");
+        result.put("accountId", String.valueOf(accountId));
+        result.put("deletedAt", account.getDeletedAt().toString());
+        return result;
+    }
+
+    // Group 4 Feature 3: Admin Dashboard Stats
+    public Map<String, Object> getDashboardStats() {
+        long totalAccounts = bankAccountRepository.countByDeletedFalse();
+        long activeAccounts = bankAccountRepository.countActiveAccounts();
+        long inactiveAccounts = bankAccountRepository.countInactiveAccounts();
+        java.math.BigDecimal totalBalance = bankAccountRepository.sumAllBalances();
+
+        Map<String, Object> stats = new java.util.LinkedHashMap<>();
+        stats.put("totalAccounts", totalAccounts);
+        stats.put("activeAccounts", activeAccounts);
+        stats.put("inactiveAccounts", inactiveAccounts);
+        stats.put("totalBalanceAcrossAllAccounts", totalBalance);
+        stats.put("generatedAt", LocalDateTime.now().toString());
+        return stats;
+    }
+
     private String generateAccountNumber() {
         return "ACC" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }

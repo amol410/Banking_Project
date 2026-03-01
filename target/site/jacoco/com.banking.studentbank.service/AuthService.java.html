@@ -2,7 +2,10 @@
 
 import com.banking.studentbank.dto.AuthResponse;
 import com.banking.studentbank.dto.LoginRequest;
+import com.banking.studentbank.dto.RefreshTokenRequest;
 import com.banking.studentbank.dto.RegisterRequest;
+import com.banking.studentbank.model.AuditStatus;
+import com.banking.studentbank.model.RefreshToken;
 import com.banking.studentbank.model.User;
 import com.banking.studentbank.repository.UserRepository;
 import com.banking.studentbank.security.JwtUtil;
@@ -20,45 +23,87 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenService refreshTokenService;
+    private final EmailService emailService;
+    private final AuditLogService auditLogService;
 
     public AuthResponse register(RegisterRequest request) {
-<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (userRepository.existsByUsername(request.getUsername())) {</span>
-<span class="fc" id="L26">            throw new IllegalArgumentException(&quot;Username already exists: &quot; + request.getUsername());</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (userRepository.existsByUsername(request.getUsername())) {</span>
+<span class="fc" id="L32">            throw new IllegalArgumentException(&quot;Username already exists: &quot; + request.getUsername());</span>
         }
 
-<span class="fc" id="L29">        User user = User.builder()</span>
-<span class="fc" id="L30">                .username(request.getUsername())</span>
-<span class="fc" id="L31">                .password(passwordEncoder.encode(request.getPassword()))</span>
-<span class="fc" id="L32">                .email(request.getEmail())</span>
-<span class="fc" id="L33">                .role(request.getRole())</span>
-<span class="fc" id="L34">                .build();</span>
+<span class="fc" id="L35">        User user = User.builder()</span>
+<span class="fc" id="L36">                .username(request.getUsername())</span>
+<span class="fc" id="L37">                .password(passwordEncoder.encode(request.getPassword()))</span>
+<span class="fc" id="L38">                .email(request.getEmail())</span>
+<span class="fc" id="L39">                .role(request.getRole())</span>
+<span class="fc" id="L40">                .build();</span>
 
-<span class="fc" id="L36">        userRepository.save(user);</span>
+<span class="fc" id="L42">        userRepository.save(user);</span>
 
-<span class="fc" id="L38">        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());</span>
+<span class="fc" id="L44">        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());</span>
+<span class="fc" id="L45">        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getUsername());</span>
 
-<span class="fc" id="L40">        return AuthResponse.builder()</span>
-<span class="fc" id="L41">                .token(token)</span>
-<span class="fc" id="L42">                .username(user.getUsername())</span>
-<span class="fc" id="L43">                .role(user.getRole().name())</span>
-<span class="fc" id="L44">                .build();</span>
+        // Send welcome email
+<span class="fc" id="L48">        emailService.sendWelcomeEmail(user.getEmail(), user.getUsername());</span>
+
+        // Audit log
+<span class="fc" id="L51">        auditLogService.log(user.getUsername(), &quot;REGISTER&quot;,</span>
+<span class="fc" id="L52">                &quot;New user registered with role: &quot; + user.getRole(), &quot;N/A&quot;, AuditStatus.SUCCESS);</span>
+
+<span class="fc" id="L54">        return AuthResponse.builder()</span>
+<span class="fc" id="L55">                .token(token)</span>
+<span class="fc" id="L56">                .refreshToken(refreshToken.getToken())</span>
+<span class="fc" id="L57">                .username(user.getUsername())</span>
+<span class="fc" id="L58">                .role(user.getRole().name())</span>
+<span class="fc" id="L59">                .build();</span>
     }
 
     public AuthResponse login(LoginRequest request) {
-<span class="fc" id="L48">        authenticationManager.authenticate(</span>
-<span class="fc" id="L49">                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())</span>
+<span class="fc" id="L63">        authenticationManager.authenticate(</span>
+<span class="fc" id="L64">                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())</span>
         );
 
-<span class="fc" id="L52">        User user = userRepository.findByUsername(request.getUsername())</span>
-<span class="pc" id="L53">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;User not found&quot;));</span>
+<span class="fc" id="L67">        User user = userRepository.findByUsername(request.getUsername())</span>
+<span class="pc" id="L68">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;User not found&quot;));</span>
 
-<span class="fc" id="L55">        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());</span>
+<span class="fc" id="L70">        String token = jwtUtil.generateToken(user.getUsername(), user.getRole().name());</span>
+<span class="fc" id="L71">        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getUsername());</span>
 
-<span class="fc" id="L57">        return AuthResponse.builder()</span>
-<span class="fc" id="L58">                .token(token)</span>
-<span class="fc" id="L59">                .username(user.getUsername())</span>
-<span class="fc" id="L60">                .role(user.getRole().name())</span>
-<span class="fc" id="L61">                .build();</span>
+        // Audit log
+<span class="fc" id="L74">        auditLogService.log(user.getUsername(), &quot;LOGIN&quot;,</span>
+                &quot;User logged in successfully&quot;, &quot;N/A&quot;, AuditStatus.SUCCESS);
+
+<span class="fc" id="L77">        return AuthResponse.builder()</span>
+<span class="fc" id="L78">                .token(token)</span>
+<span class="fc" id="L79">                .refreshToken(refreshToken.getToken())</span>
+<span class="fc" id="L80">                .username(user.getUsername())</span>
+<span class="fc" id="L81">                .role(user.getRole().name())</span>
+<span class="fc" id="L82">                .build();</span>
+    }
+
+    public AuthResponse refreshToken(RefreshTokenRequest request) {
+<span class="nc" id="L86">        RefreshToken refreshToken = refreshTokenService.verifyRefreshToken(request.getRefreshToken());</span>
+<span class="nc" id="L87">        User user = refreshToken.getUser();</span>
+
+<span class="nc" id="L89">        String newToken = jwtUtil.generateToken(user.getUsername(), user.getRole().name());</span>
+<span class="nc" id="L90">        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user.getUsername());</span>
+
+<span class="nc" id="L92">        auditLogService.log(user.getUsername(), &quot;TOKEN_REFRESH&quot;,</span>
+                &quot;Access token refreshed&quot;, &quot;N/A&quot;, AuditStatus.SUCCESS);
+
+<span class="nc" id="L95">        return AuthResponse.builder()</span>
+<span class="nc" id="L96">                .token(newToken)</span>
+<span class="nc" id="L97">                .refreshToken(newRefreshToken.getToken())</span>
+<span class="nc" id="L98">                .username(user.getUsername())</span>
+<span class="nc" id="L99">                .role(user.getRole().name())</span>
+<span class="nc" id="L100">                .build();</span>
+    }
+
+    public String logout(String username) {
+<span class="nc" id="L104">        refreshTokenService.deleteByUsername(username);</span>
+<span class="nc" id="L105">        auditLogService.log(username, &quot;LOGOUT&quot;, &quot;User logged out&quot;, &quot;N/A&quot;, AuditStatus.SUCCESS);</span>
+<span class="nc" id="L106">        return &quot;Logged out successfully&quot;;</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

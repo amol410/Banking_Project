@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CsvExportService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Student Bank Account Management</a> &gt; <a href="index.source.html" class="el_package">com.banking.studentbank.service</a> &gt; <span class="el_source">CsvExportService.java</span></div><h1>CsvExportService.java</h1><pre class="source lang-java linenums">package com.banking.studentbank.service;
+
+import com.banking.studentbank.exception.AccountNotFoundException;
+import com.banking.studentbank.model.BankAccount;
+import com.banking.studentbank.model.Transaction;
+import com.banking.studentbank.repository.BankAccountRepository;
+import com.banking.studentbank.repository.TransactionRepository;
+import com.opencsv.CSVWriter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class CsvExportService {
+
+    private final BankAccountRepository bankAccountRepository;
+    private final TransactionRepository transactionRepository;
+
+<span class="fc" id="L27">    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd HH:mm:ss&quot;);</span>
+
+    // Export all accounts to CSV
+    public byte[] exportAccountsToCsv() {
+<span class="nc" id="L31">        List&lt;BankAccount&gt; accounts = bankAccountRepository.findByDeletedFalse();</span>
+
+<span class="nc" id="L33">        ByteArrayOutputStream out = new ByteArrayOutputStream();</span>
+<span class="nc" id="L34">        try (CSVWriter writer = new CSVWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))) {</span>
+
+            // Header
+<span class="nc" id="L37">            writer.writeNext(new String[]{</span>
+                &quot;Account ID&quot;, &quot;Account Number&quot;, &quot;Holder Name&quot;,
+                &quot;Account Type&quot;, &quot;Balance&quot;, &quot;Status&quot;, &quot;Created At&quot;
+            });
+
+            // Rows
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            for (BankAccount a : accounts) {</span>
+<span class="nc" id="L44">                writer.writeNext(new String[]{</span>
+<span class="nc" id="L45">                    String.valueOf(a.getAccountId()),</span>
+<span class="nc" id="L46">                    a.getAccountNumber(),</span>
+<span class="nc" id="L47">                    a.getAccountHolderName(),</span>
+<span class="nc" id="L48">                    a.getAccountType().name(),</span>
+<span class="nc" id="L49">                    a.getBalance().toString(),</span>
+<span class="nc" id="L50">                    a.getStatus().name(),</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">                    a.getCreatedAt() != null ? a.getCreatedAt().format(FORMATTER) : &quot;&quot;</span>
+                });
+<span class="nc" id="L53">            }</span>
+<span class="nc" id="L54">        } catch (Exception e) {</span>
+<span class="nc" id="L55">            throw new RuntimeException(&quot;Failed to generate CSV: &quot; + e.getMessage());</span>
+<span class="nc" id="L56">        }</span>
+
+<span class="nc" id="L58">        return out.toByteArray();</span>
+    }
+
+    // Export transactions of a specific account to CSV
+    public byte[] exportTransactionsToCsv(Long accountId) {
+<span class="nc" id="L63">        BankAccount account = bankAccountRepository.findById(accountId)</span>
+<span class="nc" id="L64">                .orElseThrow(() -&gt; new AccountNotFoundException(accountId));</span>
+
+<span class="nc" id="L66">        List&lt;Transaction&gt; transactions = transactionRepository</span>
+<span class="nc" id="L67">                .findByFromAccountOrToAccount(account, account,</span>
+<span class="nc" id="L68">                        PageRequest.of(0, 1000, Sort.by(Sort.Direction.DESC, &quot;timestamp&quot;)))</span>
+<span class="nc" id="L69">                .getContent();</span>
+
+<span class="nc" id="L71">        ByteArrayOutputStream out = new ByteArrayOutputStream();</span>
+<span class="nc" id="L72">        try (CSVWriter writer = new CSVWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))) {</span>
+
+            // Header
+<span class="nc" id="L75">            writer.writeNext(new String[]{</span>
+                &quot;Transaction ID&quot;, &quot;Type&quot;, &quot;Amount&quot;,
+                &quot;From Account&quot;, &quot;To Account&quot;, &quot;Description&quot;, &quot;Timestamp&quot;
+            });
+
+            // Rows
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            for (Transaction t : transactions) {</span>
+<span class="nc" id="L82">                writer.writeNext(new String[]{</span>
+<span class="nc" id="L83">                    String.valueOf(t.getTransactionId()),</span>
+<span class="nc" id="L84">                    t.getType().name(),</span>
+<span class="nc" id="L85">                    t.getAmount().toString(),</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                    t.getFromAccount() != null ? t.getFromAccount().getAccountNumber() : &quot;-&quot;,</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                    t.getToAccount() != null ? t.getToAccount().getAccountNumber() : &quot;-&quot;,</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                    t.getDescription() != null ? t.getDescription() : &quot;-&quot;,</span>
+<span class="nc" id="L89">                    t.getTimestamp().format(FORMATTER)</span>
+                });
+<span class="nc" id="L91">            }</span>
+<span class="nc" id="L92">        } catch (Exception e) {</span>
+<span class="nc" id="L93">            throw new RuntimeException(&quot;Failed to generate CSV: &quot; + e.getMessage());</span>
+<span class="nc" id="L94">        }</span>
+
+<span class="nc" id="L96">        return out.toByteArray();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

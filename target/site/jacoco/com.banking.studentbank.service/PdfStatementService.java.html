@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfStatementService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Student Bank Account Management</a> &gt; <a href="index.source.html" class="el_package">com.banking.studentbank.service</a> &gt; <span class="el_source">PdfStatementService.java</span></div><h1>PdfStatementService.java</h1><pre class="source lang-java linenums">package com.banking.studentbank.service;
+
+import com.banking.studentbank.exception.AccountNotFoundException;
+import com.banking.studentbank.model.BankAccount;
+import com.banking.studentbank.model.Transaction;
+import com.banking.studentbank.repository.BankAccountRepository;
+import com.banking.studentbank.repository.TransactionRepository;
+import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class PdfStatementService {
+
+    private final BankAccountRepository bankAccountRepository;
+    private final TransactionRepository transactionRepository;
+
+    public byte[] generateStatement(Long accountId) {
+<span class="nc" id="L34">        BankAccount account = bankAccountRepository.findById(accountId)</span>
+<span class="nc" id="L35">                .orElseThrow(() -&gt; new AccountNotFoundException(accountId));</span>
+
+<span class="nc" id="L37">        List&lt;Transaction&gt; transactions = transactionRepository</span>
+<span class="nc" id="L38">                .findByFromAccountOrToAccount(account, account,</span>
+<span class="nc" id="L39">                        PageRequest.of(0, 50, Sort.by(Sort.Direction.DESC, &quot;timestamp&quot;)))</span>
+<span class="nc" id="L40">                .getContent();</span>
+
+<span class="nc" id="L42">        ByteArrayOutputStream out = new ByteArrayOutputStream();</span>
+<span class="nc" id="L43">        PdfWriter writer = new PdfWriter(out);</span>
+<span class="nc" id="L44">        PdfDocument pdf = new PdfDocument(writer);</span>
+<span class="nc" id="L45">        Document document = new Document(pdf);</span>
+
+<span class="nc" id="L47">        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(&quot;dd-MM-yyyy HH:mm&quot;);</span>
+
+        // Title
+<span class="nc" id="L50">        document.add(new Paragraph(&quot;STUDENT BANK&quot;)</span>
+<span class="nc" id="L51">                .setFontSize(20)</span>
+<span class="nc" id="L52">                .setBold()</span>
+<span class="nc" id="L53">                .setTextAlignment(TextAlignment.CENTER));</span>
+
+<span class="nc" id="L55">        document.add(new Paragraph(&quot;Account Statement&quot;)</span>
+<span class="nc" id="L56">                .setFontSize(14)</span>
+<span class="nc" id="L57">                .setTextAlignment(TextAlignment.CENTER));</span>
+
+<span class="nc" id="L59">        document.add(new Paragraph(&quot; &quot;));</span>
+
+        // Account Details
+<span class="nc" id="L62">        document.add(new Paragraph(&quot;Account Details&quot;).setBold().setFontSize(12));</span>
+<span class="nc" id="L63">        document.add(new Paragraph(&quot;Account Holder : &quot; + account.getAccountHolderName()));</span>
+<span class="nc" id="L64">        document.add(new Paragraph(&quot;Account Number : &quot; + account.getAccountNumber()));</span>
+<span class="nc" id="L65">        document.add(new Paragraph(&quot;Account Type   : &quot; + account.getAccountType()));</span>
+<span class="nc" id="L66">        document.add(new Paragraph(&quot;Current Balance: Rs. &quot; + account.getBalance()));</span>
+<span class="nc" id="L67">        document.add(new Paragraph(&quot;Status         : &quot; + account.getStatus()));</span>
+<span class="nc" id="L68">        document.add(new Paragraph(&quot; &quot;));</span>
+
+        // Transactions Table
+<span class="nc" id="L71">        document.add(new Paragraph(&quot;Transaction History&quot;).setBold().setFontSize(12));</span>
+
+<span class="nc" id="L73">        Table table = new Table(UnitValue.createPercentArray(new float[]{15, 15, 20, 15, 35}))</span>
+<span class="nc" id="L74">                .useAllAvailableWidth();</span>
+
+        // Table Header
+<span class="nc" id="L77">        String[] headers = {&quot;Txn ID&quot;, &quot;Type&quot;, &quot;Amount (Rs.)&quot;, &quot;Date&quot;, &quot;Description&quot;};</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (String header : headers) {</span>
+<span class="nc" id="L79">            table.addHeaderCell(new Cell()</span>
+<span class="nc" id="L80">                    .add(new Paragraph(header).setBold())</span>
+<span class="nc" id="L81">                    .setBackgroundColor(ColorConstants.LIGHT_GRAY)</span>
+<span class="nc" id="L82">                    .setTextAlignment(TextAlignment.CENTER));</span>
+        }
+
+        // Table Rows
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        for (Transaction txn : transactions) {</span>
+<span class="nc" id="L87">            table.addCell(new Cell().add(new Paragraph(String.valueOf(txn.getTransactionId()))));</span>
+<span class="nc" id="L88">            table.addCell(new Cell().add(new Paragraph(txn.getType().name())));</span>
+<span class="nc" id="L89">            table.addCell(new Cell().add(new Paragraph(&quot;Rs. &quot; + txn.getAmount())));</span>
+<span class="nc" id="L90">            table.addCell(new Cell().add(new Paragraph(txn.getTimestamp().format(formatter))));</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            table.addCell(new Cell().add(new Paragraph(txn.getDescription() != null ? txn.getDescription() : &quot;-&quot;)));</span>
+<span class="nc" id="L92">        }</span>
+
+<span class="nc" id="L94">        document.add(table);</span>
+<span class="nc" id="L95">        document.add(new Paragraph(&quot; &quot;));</span>
+<span class="nc" id="L96">        document.add(new Paragraph(&quot;Generated on: &quot; + java.time.LocalDateTime.now().format(formatter))</span>
+<span class="nc" id="L97">                .setFontSize(9)</span>
+<span class="nc" id="L98">                .setTextAlignment(TextAlignment.RIGHT));</span>
+
+<span class="nc" id="L100">        document.close();</span>
+<span class="nc" id="L101">        return out.toByteArray();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

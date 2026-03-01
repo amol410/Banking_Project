@@ -43,6 +43,12 @@ public class BankAccount {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // Soft Delete
+    @Column(nullable = false)
+    private boolean deleted = false;
+
+    private LocalDateTime deletedAt;
+
     @OneToMany(mappedBy = "fromAccount", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Transaction> sentTransactions = new ArrayList<>();
 

@@ -1,0 +1,5 @@
+"Transaction ID","Type","Amount","From Account","To Account","Description","Timestamp"
+"9","DEPOSIT","11.67","-","ACC8A19BCBF","Monthly interest credit @ 4.00% p.a.","2026-03-02 03:24:46"
+"3","TRANSFER","500.00","ACC8A19BCBF","ACC475A240A","Rent payment","2026-03-02 02:43:42"
+"2","WITHDRAWAL","1000.00","ACC8A19BCBF","-","ATM withdrawal","2026-03-02 02:42:15"
+"1","DEPOSIT","5000.00","-","ACC8A19BCBF","Initial deposit","2026-03-02 02:41:25"

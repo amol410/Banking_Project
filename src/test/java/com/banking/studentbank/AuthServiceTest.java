@@ -3,11 +3,15 @@ package com.banking.studentbank;
 import com.banking.studentbank.dto.AuthResponse;
 import com.banking.studentbank.dto.LoginRequest;
 import com.banking.studentbank.dto.RegisterRequest;
+import com.banking.studentbank.model.RefreshToken;
 import com.banking.studentbank.model.Role;
 import com.banking.studentbank.model.User;
 import com.banking.studentbank.repository.UserRepository;
 import com.banking.studentbank.security.JwtUtil;
+import com.banking.studentbank.service.AuditLogService;
 import com.banking.studentbank.service.AuthService;
+import com.banking.studentbank.service.EmailService;
+import com.banking.studentbank.service.RefreshTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +23,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -40,6 +45,15 @@ class AuthServiceTest {
 
     @Mock
     private AuthenticationManager authenticationManager;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
+    @Mock
+    private EmailService emailService;
+
+    @Mock
+    private AuditLogService auditLogService;
 
     @InjectMocks
     private AuthService authService;
@@ -71,12 +85,20 @@ class AuthServiceTest {
 
     // ==================== register ====================
 
+    private RefreshToken mockRefreshToken() {
+        RefreshToken rt = new RefreshToken();
+        rt.setToken("mock-refresh-token");
+        rt.setExpiresAt(LocalDateTime.now().plusDays(7));
+        return rt;
+    }
+
     @Test
     void register_ShouldReturnAuthResponse_WhenRequestIsValid() {
         when(userRepository.existsByUsername("testuser")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("encodedPassword");
         when(userRepository.save(any(User.class))).thenReturn(testUser);
         when(jwtUtil.generateToken("testuser", "CUSTOMER")).thenReturn("mockJwtToken");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken());
 
         AuthResponse response = authService.register(registerRequest);
 
@@ -108,6 +130,7 @@ class AuthServiceTest {
             return testUser;
         });
         when(jwtUtil.generateToken(anyString(), anyString())).thenReturn("token");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken());
 
         authService.register(registerRequest);
 
@@ -130,6 +153,7 @@ class AuthServiceTest {
         when(passwordEncoder.encode(anyString())).thenReturn("encodedPass");
         when(userRepository.save(any(User.class))).thenReturn(adminUser);
         when(jwtUtil.generateToken(anyString(), anyString())).thenReturn("adminToken");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken());
 
         AuthResponse response = authService.register(registerRequest);
 
@@ -144,6 +168,7 @@ class AuthServiceTest {
                 .thenReturn(null);
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
         when(jwtUtil.generateToken("testuser", "CUSTOMER")).thenReturn("mockJwtToken");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken());
 
         AuthResponse response = authService.login(loginRequest);
 
@@ -168,6 +193,7 @@ class AuthServiceTest {
                 .thenReturn(null);
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
         when(jwtUtil.generateToken(anyString(), anyString())).thenReturn("token");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken());
 
         authService.login(loginRequest);
 
@@ -180,6 +206,7 @@ class AuthServiceTest {
         when(authenticationManager.authenticate(any())).thenReturn(null);
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
         when(jwtUtil.generateToken("testuser", "CUSTOMER")).thenReturn("tokenWithClaims");
+        when(refreshTokenService.createRefreshToken(anyString())).thenReturn(mockRefreshToken());
 
         AuthResponse response = authService.login(loginRequest);
 

@@ -158,4 +158,18 @@ public class AccountController {
         Page<TransactionResponse> transactions = transactionService.getTransactions(id, pageable);
         return ResponseEntity.ok(transactions);
     }
+
+    // Group 4 Feature 1: Global Search
+    @GetMapping("/global-search")
+    @Operation(summary = "Global search accounts by name or account number")
+    public ResponseEntity<List<AccountResponse>> globalSearch(@RequestParam String keyword) {
+        return ResponseEntity.ok(accountService.globalSearch(keyword));
+    }
+
+    // Group 4 Feature 3: Soft Delete Account
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Soft delete an account (marks as deleted, not removed from DB)")
+    public ResponseEntity<Map<String, String>> softDelete(@PathVariable Long id) {
+        return ResponseEntity.ok(accountService.softDeleteAccount(id));
+    }
 }

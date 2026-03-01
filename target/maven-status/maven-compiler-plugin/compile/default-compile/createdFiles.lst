@@ -14,6 +14,7 @@ com\banking\studentbank\controller\AuthController.class
 com\banking\studentbank\dto\UserProfileResponse$UserProfileResponseBuilder.class
 com\banking\studentbank\security\JwtUtil.class
 com\banking\studentbank\controller\UserController.class
+com\banking\studentbank\security\RateLimitingFilter.class
 com\banking\studentbank\dto\RegisterRequest.class
 com\banking\studentbank\model\User$UserBuilder.class
 com\banking\studentbank\service\RefreshTokenService.class
@@ -52,6 +53,7 @@ com\banking\studentbank\dto\AccountResponse.class
 com\banking\studentbank\dto\RefreshTokenRequest.class
 com\banking\studentbank\repository\RefreshTokenRepository.class
 com\banking\studentbank\dto\ChangePasswordRequest.class
+com\banking\studentbank\service\CsvExportService.class
 com\banking\studentbank\model\Transaction$TransactionBuilder.class
 com\banking\studentbank\dto\WithdrawRequest.class
 com\banking\studentbank\dto\ErrorResponse$ErrorResponseBuilder.class

@@ -16,6 +16,9 @@ Designed for fresher interview preparation (TCS / Infosys / Wipro).
 | Lombok | 1.18.38 |
 | SpringDoc OpenAPI | 2.5.0 |
 | iText PDF | 7.2.5 |
+| OpenCSV | 5.9 |
+| Bucket4j (Rate Limiting) | 8.10.1 |
+| Jacoco (Test Coverage) | 0.8.13 |
 
 ---
 
@@ -360,6 +363,121 @@ Note: Adds interest to all active SAVINGS accounts automatically
 
 ---
 
+---
+
+## Version 5.0 — Search, Export, Soft Delete & Rate Limiting
+
+**New Features added over v4.0:**
+- Global Search (search by name or account number in one query)
+- Export to CSV (all accounts or account-specific transactions)
+- Soft Delete (mark account as deleted without removing from DB)
+- Admin Dashboard Stats (total accounts, balances, active/inactive counts)
+- Rate Limiting (60 requests per minute per IP — returns 429 if exceeded)
+
+### New Endpoints
+
+| Method | URL | Description | Auth Required |
+|--------|-----|-------------|---------------|
+| GET | `/api/accounts/global-search?keyword=` | Search by name or account number | Yes |
+| DELETE | `/api/accounts/{id}` | Soft delete an account | Yes |
+| GET | `/api/accounts/export/csv` | Export all accounts as CSV | Yes |
+| GET | `/api/accounts/{id}/transactions/export/csv` | Export transactions as CSV | Yes |
+| GET | `/api/admin/dashboard` | Admin dashboard statistics | Yes |
+
+### Test in Postman
+
+**1. Global Search** *(Authorization: Bearer <token>)*
+```
+GET http://localhost:8080/api/accounts/global-search?keyword=John
+GET http://localhost:8080/api/accounts/global-search?keyword=ACC8A19
+Expected: List of accounts matching name or account number
+```
+
+**2. Soft Delete Account** *(Authorization: Bearer <token>)*
+```
+DELETE http://localhost:8080/api/accounts/1
+Expected:
+{
+  "message": "Account soft deleted successfully",
+  "accountId": "1",
+  "deletedAt": "2026-03-02T..."
+}
+Note: Account remains in DB, status becomes INACTIVE, deleted=true
+```
+
+**3. Export All Accounts to CSV** *(Authorization: Bearer <token>)*
+```
+GET http://localhost:8080/api/accounts/export/csv
+In Postman: Click "Send and Download" — saves as accounts.csv
+Columns: Account ID, Account Number, Holder Name, Account Type, Balance, Status, Created At
+```
+
+**4. Export Transactions to CSV** *(Authorization: Bearer <token>)*
+```
+GET http://localhost:8080/api/accounts/1/transactions/export/csv
+In Postman: Click "Send and Download" — saves as transactions_account_1.csv
+Columns: Transaction ID, Type, Amount, From Account, To Account, Description, Timestamp
+```
+
+**5. Admin Dashboard** *(Authorization: Bearer <token>)*
+```
+GET http://localhost:8080/api/admin/dashboard
+Expected:
+{
+  "totalAccounts": 5,
+  "activeAccounts": 4,
+  "inactiveAccounts": 1,
+  "totalBalanceAcrossAllAccounts": 25000.00,
+  "generatedAt": "2026-03-02T..."
+}
+```
+
+**6. Rate Limiting Test**
+```
+Send more than 60 requests in 1 minute from the same IP.
+Expected response on 61st request:
+HTTP 429 Too Many Requests
+{
+  "status": 429,
+  "message": "Too many requests. Limit: 60 requests per minute."
+}
+Response headers include:
+  X-Rate-Limit-Limit: 60
+  X-Rate-Limit-Remaining: <remaining count>
+```
+
+---
+
+## Email Notifications Setup
+
+Email notifications are **disabled by default**. To enable them, edit the file:
+
+```
+src/main/resources/application.properties
+```
+
+Change/add the following lines:
+
+```properties
+# Enable email notifications
+app.mail.enabled=true
+
+# Gmail SMTP settings
+spring.mail.username=your_gmail@gmail.com
+spring.mail.password=your_app_password
+```
+
+**Steps to get Gmail App Password:**
+1. Go to your Google Account → Security
+2. Enable 2-Step Verification (required)
+3. Go to Security → App passwords
+4. Create a new app password for "Mail"
+5. Copy the 16-character password and paste it as `spring.mail.password`
+
+**Note:** Use App Password, NOT your regular Gmail password. App passwords work even with 2FA enabled.
+
+---
+
 ## Error Responses
 
 All errors follow this format:
@@ -418,5 +536,7 @@ All errors follow this format:
 ```bash
 mvn test
 ```
-- 45 unit and integration tests
+- 45 unit and integration tests (15 AccountServiceTest + 8 AuthServiceTest + 12 AccountControllerTest + 10 AuthControllerTest)
+- All tests pass with BUILD SUCCESS
 - Jacoco coverage report at: `target/site/jacoco/index.html`
+- Minimum coverage threshold: 70% line coverage

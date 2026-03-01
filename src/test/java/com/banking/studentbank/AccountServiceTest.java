@@ -212,6 +212,7 @@ class AccountServiceTest {
         when(bankAccountRepository.findById(1L)).thenReturn(Optional.of(testAccount));
         when(bankAccountRepository.save(any(BankAccount.class))).thenReturn(updatedAccount);
         when(transactionService.saveTransaction(any(Transaction.class))).thenReturn(new Transaction());
+        when(transactionService.getTodayWithdrawalTotal(any(BankAccount.class))).thenReturn(BigDecimal.ZERO);
 
         AccountResponse response = accountService.withdraw(1L, request);
 

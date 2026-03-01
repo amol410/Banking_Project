@@ -17,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping(&quot;/api/accounts&quot;)
@@ -31,22 +33,22 @@ public class AccountController {
     @PostMapping
     @Operation(summary = &quot;Create a new bank account&quot;)
     public ResponseEntity&lt;AccountResponse&gt; createAccount(@Valid @RequestBody CreateAccountRequest request) {
-<span class="fc" id="L34">        AccountResponse response = accountService.createAccount(request);</span>
-<span class="fc" id="L35">        return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+<span class="fc" id="L36">        AccountResponse response = accountService.createAccount(request);</span>
+<span class="fc" id="L37">        return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
     }
 
     @GetMapping(&quot;/{id}&quot;)
     @Operation(summary = &quot;Get account by ID&quot;)
     public ResponseEntity&lt;AccountResponse&gt; getAccount(@PathVariable Long id) {
-<span class="fc" id="L41">        AccountResponse response = accountService.getAccount(id);</span>
-<span class="fc" id="L42">        return ResponseEntity.ok(response);</span>
+<span class="fc" id="L43">        AccountResponse response = accountService.getAccount(id);</span>
+<span class="fc" id="L44">        return ResponseEntity.ok(response);</span>
     }
 
     @GetMapping
     @Operation(summary = &quot;Get all accounts&quot;)
     public ResponseEntity&lt;List&lt;AccountResponse&gt;&gt; getAllAccounts() {
-<span class="fc" id="L48">        List&lt;AccountResponse&gt; accounts = accountService.getAllAccounts();</span>
-<span class="fc" id="L49">        return ResponseEntity.ok(accounts);</span>
+<span class="fc" id="L50">        List&lt;AccountResponse&gt; accounts = accountService.getAllAccounts();</span>
+<span class="fc" id="L51">        return ResponseEntity.ok(accounts);</span>
     }
 
     @PostMapping(&quot;/{id}/deposit&quot;)
@@ -54,8 +56,8 @@ public class AccountController {
     public ResponseEntity&lt;AccountResponse&gt; deposit(
             @PathVariable Long id,
             @Valid @RequestBody DepositRequest request) {
-<span class="fc" id="L57">        AccountResponse response = accountService.deposit(id, request);</span>
-<span class="fc" id="L58">        return ResponseEntity.ok(response);</span>
+<span class="fc" id="L59">        AccountResponse response = accountService.deposit(id, request);</span>
+<span class="fc" id="L60">        return ResponseEntity.ok(response);</span>
     }
 
     @PostMapping(&quot;/{id}/withdraw&quot;)
@@ -63,15 +65,83 @@ public class AccountController {
     public ResponseEntity&lt;AccountResponse&gt; withdraw(
             @PathVariable Long id,
             @Valid @RequestBody WithdrawRequest request) {
-<span class="fc" id="L66">        AccountResponse response = accountService.withdraw(id, request);</span>
-<span class="fc" id="L67">        return ResponseEntity.ok(response);</span>
+<span class="fc" id="L68">        AccountResponse response = accountService.withdraw(id, request);</span>
+<span class="fc" id="L69">        return ResponseEntity.ok(response);</span>
     }
 
     @PostMapping(&quot;/transfer&quot;)
     @Operation(summary = &quot;Transfer funds between accounts&quot;)
     public ResponseEntity&lt;TransactionResponse&gt; transfer(@Valid @RequestBody TransferRequest request) {
-<span class="fc" id="L73">        TransactionResponse response = accountService.transfer(request);</span>
-<span class="fc" id="L74">        return ResponseEntity.ok(response);</span>
+<span class="fc" id="L75">        TransactionResponse response = accountService.transfer(request);</span>
+<span class="fc" id="L76">        return ResponseEntity.ok(response);</span>
+    }
+
+    // Feature 6: Date filter on transactions
+    @GetMapping(&quot;/{id}/transactions/filter&quot;)
+    @Operation(summary = &quot;Get transactions between two dates&quot;)
+    public ResponseEntity&lt;List&lt;TransactionResponse&gt;&gt; getTransactionsByDate(
+            @PathVariable Long id,
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+<span class="nc" id="L86">        java.time.LocalDate start = java.time.LocalDate.parse(startDate);</span>
+<span class="nc" id="L87">        java.time.LocalDate end = java.time.LocalDate.parse(endDate);</span>
+<span class="nc" id="L88">        return ResponseEntity.ok(transactionService.getTransactionsByDateRange(id, start, end));</span>
+    }
+
+    // Feature 11: Interest calculation
+    @GetMapping(&quot;/{id}/interest&quot;)
+    @Operation(summary = &quot;Calculate interest for a savings account&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; calculateInterest(@PathVariable Long id) {
+<span class="nc" id="L95">        return ResponseEntity.ok(accountService.calculateInterest(id));</span>
+    }
+
+    // Feature 1: Close Account
+    @PutMapping(&quot;/{id}/close&quot;)
+    @Operation(summary = &quot;Close (deactivate) an account&quot;)
+    public ResponseEntity&lt;AccountResponse&gt; closeAccount(@PathVariable Long id) {
+<span class="nc" id="L102">        return ResponseEntity.ok(accountService.closeAccount(id));</span>
+    }
+
+    // Feature 2: Update Account Holder Name
+    @PutMapping(&quot;/{id}/update-name&quot;)
+    @Operation(summary = &quot;Update account holder name&quot;)
+    public ResponseEntity&lt;AccountResponse&gt; updateName(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAccountNameRequest request) {
+<span class="nc" id="L111">        return ResponseEntity.ok(accountService.updateAccountName(id, request.getAccountHolderName()));</span>
+    }
+
+    // Feature 3: Get Account by Account Number
+    @GetMapping(&quot;/number/{accountNumber}&quot;)
+    @Operation(summary = &quot;Get account by account number&quot;)
+    public ResponseEntity&lt;AccountResponse&gt; getByAccountNumber(@PathVariable String accountNumber) {
+<span class="nc" id="L118">        return ResponseEntity.ok(accountService.getAccountByNumber(accountNumber));</span>
+    }
+
+    // Feature 4: Search Accounts by Name
+    @GetMapping(&quot;/search&quot;)
+    @Operation(summary = &quot;Search accounts by holder name&quot;)
+    public ResponseEntity&lt;List&lt;AccountResponse&gt;&gt; searchByName(@RequestParam String name) {
+<span class="nc" id="L125">        return ResponseEntity.ok(accountService.searchByName(name));</span>
+    }
+
+    // Feature 5: Mini Statement (last 5 transactions)
+    @GetMapping(&quot;/{id}/mini-statement&quot;)
+    @Operation(summary = &quot;Get last 5 transactions (mini statement)&quot;)
+    public ResponseEntity&lt;List&lt;TransactionResponse&gt;&gt; getMiniStatement(@PathVariable Long id) {
+<span class="nc" id="L132">        return ResponseEntity.ok(transactionService.getMiniStatement(id));</span>
+    }
+
+    @GetMapping(&quot;/{id}/balance&quot;)
+    @Operation(summary = &quot;Get account balance&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getBalance(@PathVariable Long id) {
+<span class="nc" id="L138">        AccountResponse account = accountService.getAccount(id);</span>
+<span class="nc" id="L139">        Map&lt;String, Object&gt; response = new java.util.LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L140">        response.put(&quot;accountId&quot;, account.getAccountId());</span>
+<span class="nc" id="L141">        response.put(&quot;accountNumber&quot;, account.getAccountNumber());</span>
+<span class="nc" id="L142">        response.put(&quot;accountHolderName&quot;, account.getAccountHolderName());</span>
+<span class="nc" id="L143">        response.put(&quot;balance&quot;, account.getBalance());</span>
+<span class="nc" id="L144">        return ResponseEntity.ok(response);</span>
     }
 
     @GetMapping(&quot;/{id}/transactions&quot;)
@@ -83,10 +153,24 @@ public class AccountController {
             @RequestParam(defaultValue = &quot;timestamp&quot;) String sortBy,
             @RequestParam(defaultValue = &quot;DESC&quot;) String direction) {
 
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        Sort.Direction sortDirection = direction.equalsIgnoreCase(&quot;ASC&quot;) ? Sort.Direction.ASC : Sort.Direction.DESC;</span>
-<span class="fc" id="L87">        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));</span>
-<span class="fc" id="L88">        Page&lt;TransactionResponse&gt; transactions = transactionService.getTransactions(id, pageable);</span>
-<span class="fc" id="L89">        return ResponseEntity.ok(transactions);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        Sort.Direction sortDirection = direction.equalsIgnoreCase(&quot;ASC&quot;) ? Sort.Direction.ASC : Sort.Direction.DESC;</span>
+<span class="fc" id="L157">        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));</span>
+<span class="fc" id="L158">        Page&lt;TransactionResponse&gt; transactions = transactionService.getTransactions(id, pageable);</span>
+<span class="fc" id="L159">        return ResponseEntity.ok(transactions);</span>
+    }
+
+    // Group 4 Feature 1: Global Search
+    @GetMapping(&quot;/global-search&quot;)
+    @Operation(summary = &quot;Global search accounts by name or account number&quot;)
+    public ResponseEntity&lt;List&lt;AccountResponse&gt;&gt; globalSearch(@RequestParam String keyword) {
+<span class="nc" id="L166">        return ResponseEntity.ok(accountService.globalSearch(keyword));</span>
+    }
+
+    // Group 4 Feature 3: Soft Delete Account
+    @DeleteMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Soft delete an account (marks as deleted, not removed from DB)&quot;)
+    public ResponseEntity&lt;Map&lt;String, String&gt;&gt; softDelete(@PathVariable Long id) {
+<span class="nc" id="L173">        return ResponseEntity.ok(accountService.softDeleteAccount(id));</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

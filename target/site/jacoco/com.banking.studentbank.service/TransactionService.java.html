@@ -8,8 +8,17 @@ import com.banking.studentbank.repository.BankAccountRepository;
 import com.banking.studentbank.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -19,29 +28,61 @@ public class TransactionService {
     private final BankAccountRepository bankAccountRepository;
 
     public Transaction saveTransaction(Transaction transaction) {
-<span class="nc" id="L22">        return transactionRepository.save(transaction);</span>
+<span class="nc" id="L31">        return transactionRepository.save(transaction);</span>
     }
 
     public Page&lt;TransactionResponse&gt; getTransactions(Long accountId, Pageable pageable) {
-<span class="nc" id="L26">        BankAccount account = bankAccountRepository.findById(accountId)</span>
-<span class="nc" id="L27">                .orElseThrow(() -&gt; new AccountNotFoundException(accountId));</span>
+<span class="nc" id="L35">        BankAccount account = bankAccountRepository.findById(accountId)</span>
+<span class="nc" id="L36">                .orElseThrow(() -&gt; new AccountNotFoundException(accountId));</span>
 
-<span class="nc" id="L29">        return transactionRepository.findByFromAccountOrToAccount(account, account, pageable)</span>
-<span class="nc" id="L30">                .map(this::mapToResponse);</span>
+<span class="nc" id="L38">        return transactionRepository.findByFromAccountOrToAccount(account, account, pageable)</span>
+<span class="nc" id="L39">                .map(this::mapToResponse);</span>
+    }
+
+    // Feature 6: Date filter on transactions
+    public List&lt;TransactionResponse&gt; getTransactionsByDateRange(Long accountId, LocalDate startDate, LocalDate endDate) {
+<span class="nc" id="L44">        BankAccount account = bankAccountRepository.findById(accountId)</span>
+<span class="nc" id="L45">                .orElseThrow(() -&gt; new AccountNotFoundException(accountId));</span>
+
+<span class="nc" id="L47">        LocalDateTime start = startDate.atStartOfDay();</span>
+<span class="nc" id="L48">        LocalDateTime end = endDate.atTime(LocalTime.MAX);</span>
+
+<span class="nc" id="L50">        return transactionRepository.findByAccountAndDateRange(account, start, end)</span>
+<span class="nc" id="L51">                .stream()</span>
+<span class="nc" id="L52">                .map(this::mapToResponse)</span>
+<span class="nc" id="L53">                .collect(Collectors.toList());</span>
+    }
+
+    // Feature 12: Get today's total withdrawal amount for daily limit check
+    public BigDecimal getTodayWithdrawalTotal(BankAccount account) {
+<span class="nc" id="L58">        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();</span>
+<span class="nc" id="L59">        return transactionRepository.sumWithdrawalsToday(account, startOfDay);</span>
+    }
+
+    // Feature 5: Mini Statement - last 5 transactions
+    public List&lt;TransactionResponse&gt; getMiniStatement(Long accountId) {
+<span class="nc" id="L64">        BankAccount account = bankAccountRepository.findById(accountId)</span>
+<span class="nc" id="L65">                .orElseThrow(() -&gt; new AccountNotFoundException(accountId));</span>
+
+<span class="nc" id="L67">        Pageable top5 = PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, &quot;timestamp&quot;));</span>
+<span class="nc" id="L68">        return transactionRepository.findByFromAccountOrToAccount(account, account, top5)</span>
+<span class="nc" id="L69">                .stream()</span>
+<span class="nc" id="L70">                .map(this::mapToResponse)</span>
+<span class="nc" id="L71">                .collect(Collectors.toList());</span>
     }
 
     public TransactionResponse mapToResponse(Transaction transaction) {
-<span class="nc" id="L34">        return TransactionResponse.builder()</span>
-<span class="nc" id="L35">                .transactionId(transaction.getTransactionId())</span>
-<span class="nc bnc" id="L36" title="All 2 branches missed.">                .fromAccountId(transaction.getFromAccount() != null ? transaction.getFromAccount().getAccountId() : null)</span>
-<span class="nc bnc" id="L37" title="All 2 branches missed.">                .fromAccountNumber(transaction.getFromAccount() != null ? transaction.getFromAccount().getAccountNumber() : null)</span>
-<span class="nc bnc" id="L38" title="All 2 branches missed.">                .toAccountId(transaction.getToAccount() != null ? transaction.getToAccount().getAccountId() : null)</span>
-<span class="nc bnc" id="L39" title="All 2 branches missed.">                .toAccountNumber(transaction.getToAccount() != null ? transaction.getToAccount().getAccountNumber() : null)</span>
-<span class="nc" id="L40">                .type(transaction.getType())</span>
-<span class="nc" id="L41">                .amount(transaction.getAmount())</span>
-<span class="nc" id="L42">                .description(transaction.getDescription())</span>
-<span class="nc" id="L43">                .timestamp(transaction.getTimestamp())</span>
-<span class="nc" id="L44">                .build();</span>
+<span class="nc" id="L75">        return TransactionResponse.builder()</span>
+<span class="nc" id="L76">                .transactionId(transaction.getTransactionId())</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                .fromAccountId(transaction.getFromAccount() != null ? transaction.getFromAccount().getAccountId() : null)</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                .fromAccountNumber(transaction.getFromAccount() != null ? transaction.getFromAccount().getAccountNumber() : null)</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                .toAccountId(transaction.getToAccount() != null ? transaction.getToAccount().getAccountId() : null)</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                .toAccountNumber(transaction.getToAccount() != null ? transaction.getToAccount().getAccountNumber() : null)</span>
+<span class="nc" id="L81">                .type(transaction.getType())</span>
+<span class="nc" id="L82">                .amount(transaction.getAmount())</span>
+<span class="nc" id="L83">                .description(transaction.getDescription())</span>
+<span class="nc" id="L84">                .timestamp(transaction.getTimestamp())</span>
+<span class="nc" id="L85">                .build();</span>
     }
 }
-</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
