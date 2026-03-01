@@ -29,7 +29,11 @@
       "Bash(__NEW_LINE_73f01c127cadde25__ echo:*)",
       "Bash(__NEW_LINE_63201951825f9c51__ echo:*)",
       "Bash(__NEW_LINE_87695b7e419b35ac__ echo:*)",
-      "Bash(__NEW_LINE_790912ec4bbb814c__ echo:*)"
+      "Bash(__NEW_LINE_790912ec4bbb814c__ echo:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(./node_modules/.bin/tailwindcss init:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
