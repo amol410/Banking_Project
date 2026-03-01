@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwaggerConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Student Bank Account Management</a> &gt; <a href="index.source.html" class="el_package">com.banking.studentbank.config</a> &gt; <span class="el_source">SwaggerConfig.java</span></div><h1>SwaggerConfig.java</h1><pre class="source lang-java linenums">package com.banking.studentbank.config;
+
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.License;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@OpenAPIDefinition(
+        info = @Info(
+                title = &quot;Student Bank Account Management API&quot;,
+                version = &quot;1.0&quot;,
+                description = &quot;REST API for managing student bank accounts with JWT authentication&quot;
+        )
+)
+@SecurityScheme(
+        name = &quot;bearerAuth&quot;,
+        description = &quot;JWT Bearer token authentication&quot;,
+        scheme = &quot;bearer&quot;,
+        type = SecuritySchemeType.HTTP,
+        bearerFormat = &quot;JWT&quot;,
+        in = SecuritySchemeIn.HEADER
+)
+<span class="fc" id="L30">public class SwaggerConfig {</span>
+
+    @Bean
+    public OpenAPI openAPI() {
+<span class="fc" id="L34">        return new OpenAPI()</span>
+<span class="fc" id="L35">                .info(new io.swagger.v3.oas.models.info.Info()</span>
+<span class="fc" id="L36">                        .title(&quot;Student Bank Account Management API&quot;)</span>
+<span class="fc" id="L37">                        .version(&quot;1.0.0&quot;)</span>
+<span class="fc" id="L38">                        .description(&quot;A comprehensive REST API for managing student bank accounts. &quot; +</span>
+                                &quot;Features include account creation, deposits, withdrawals, transfers, &quot; +
+                                &quot;transaction history, and JWT-based authentication.&quot;)
+<span class="fc" id="L41">                        .contact(new Contact()</span>
+<span class="fc" id="L42">                                .name(&quot;Banking System&quot;)</span>
+<span class="fc" id="L43">                                .email(&quot;admin@banking.com&quot;))</span>
+<span class="fc" id="L44">                        .license(new License()</span>
+<span class="fc" id="L45">                                .name(&quot;MIT License&quot;)));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

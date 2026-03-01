@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccountController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Student Bank Account Management</a> &gt; <a href="index.source.html" class="el_package">com.banking.studentbank.controller</a> &gt; <span class="el_source">AccountController.java</span></div><h1>AccountController.java</h1><pre class="source lang-java linenums">package com.banking.studentbank.controller;
+
+import com.banking.studentbank.dto.*;
+import com.banking.studentbank.service.AccountService;
+import com.banking.studentbank.service.TransactionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/accounts&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Bank Accounts&quot;, description = &quot;Bank account management endpoints&quot;)
+@SecurityRequirement(name = &quot;bearerAuth&quot;)
+public class AccountController {
+
+    private final AccountService accountService;
+    private final TransactionService transactionService;
+
+    @PostMapping
+    @Operation(summary = &quot;Create a new bank account&quot;)
+    public ResponseEntity&lt;AccountResponse&gt; createAccount(@Valid @RequestBody CreateAccountRequest request) {
+<span class="fc" id="L34">        AccountResponse response = accountService.createAccount(request);</span>
+<span class="fc" id="L35">        return ResponseEntity.status(HttpStatus.CREATED).body(response);</span>
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Get account by ID&quot;)
+    public ResponseEntity&lt;AccountResponse&gt; getAccount(@PathVariable Long id) {
+<span class="fc" id="L41">        AccountResponse response = accountService.getAccount(id);</span>
+<span class="fc" id="L42">        return ResponseEntity.ok(response);</span>
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;Get all accounts&quot;)
+    public ResponseEntity&lt;List&lt;AccountResponse&gt;&gt; getAllAccounts() {
+<span class="fc" id="L48">        List&lt;AccountResponse&gt; accounts = accountService.getAllAccounts();</span>
+<span class="fc" id="L49">        return ResponseEntity.ok(accounts);</span>
+    }
+
+    @PostMapping(&quot;/{id}/deposit&quot;)
+    @Operation(summary = &quot;Deposit funds into an account&quot;)
+    public ResponseEntity&lt;AccountResponse&gt; deposit(
+            @PathVariable Long id,
+            @Valid @RequestBody DepositRequest request) {
+<span class="fc" id="L57">        AccountResponse response = accountService.deposit(id, request);</span>
+<span class="fc" id="L58">        return ResponseEntity.ok(response);</span>
+    }
+
+    @PostMapping(&quot;/{id}/withdraw&quot;)
+    @Operation(summary = &quot;Withdraw funds from an account&quot;)
+    public ResponseEntity&lt;AccountResponse&gt; withdraw(
+            @PathVariable Long id,
+            @Valid @RequestBody WithdrawRequest request) {
+<span class="fc" id="L66">        AccountResponse response = accountService.withdraw(id, request);</span>
+<span class="fc" id="L67">        return ResponseEntity.ok(response);</span>
+    }
+
+    @PostMapping(&quot;/transfer&quot;)
+    @Operation(summary = &quot;Transfer funds between accounts&quot;)
+    public ResponseEntity&lt;TransactionResponse&gt; transfer(@Valid @RequestBody TransferRequest request) {
+<span class="fc" id="L73">        TransactionResponse response = accountService.transfer(request);</span>
+<span class="fc" id="L74">        return ResponseEntity.ok(response);</span>
+    }
+
+    @GetMapping(&quot;/{id}/transactions&quot;)
+    @Operation(summary = &quot;Get transaction history for an account&quot;)
+    public ResponseEntity&lt;Page&lt;TransactionResponse&gt;&gt; getTransactions(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = &quot;0&quot;) int page,
+            @RequestParam(defaultValue = &quot;10&quot;) int size,
+            @RequestParam(defaultValue = &quot;timestamp&quot;) String sortBy,
+            @RequestParam(defaultValue = &quot;DESC&quot;) String direction) {
+
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        Sort.Direction sortDirection = direction.equalsIgnoreCase(&quot;ASC&quot;) ? Sort.Direction.ASC : Sort.Direction.DESC;</span>
+<span class="fc" id="L87">        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));</span>
+<span class="fc" id="L88">        Page&lt;TransactionResponse&gt; transactions = transactionService.getTransactions(id, pageable);</span>
+<span class="fc" id="L89">        return ResponseEntity.ok(transactions);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

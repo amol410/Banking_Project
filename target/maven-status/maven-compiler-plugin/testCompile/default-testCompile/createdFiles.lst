@@ -1,0 +1,4 @@
+com\banking\studentbank\AuthControllerTest.class
+com\banking\studentbank\AccountControllerTest.class
+com\banking\studentbank\AccountServiceTest.class
+com\banking\studentbank\AuthServiceTest.class

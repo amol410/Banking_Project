@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn clean:*)",
+      "Bash(mvn:*)",
+      "WebSearch",
+      "WebFetch(domain:projectlombok.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:marmo.dev)"
+    ]
+  }
+}
