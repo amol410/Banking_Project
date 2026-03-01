@@ -6,7 +6,17 @@
       "WebSearch",
       "WebFetch(domain:projectlombok.org)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:marmo.dev)"
+      "WebFetch(domain:marmo.dev)",
+      "Bash(curl:*)",
+      "Bash(__NEW_LINE_cf855fb9fc7eeda5__ echo:*)",
+      "Bash(__NEW_LINE_1a257b460a858183__ echo:*)",
+      "Bash(__NEW_LINE_b3b115e7144a617d__ echo:*)",
+      "Bash(__NEW_LINE_32fd6a4dd4e25298__ echo:*)",
+      "Bash(__NEW_LINE_f4af3b7cfcceb15c__ echo:*)",
+      "Bash(__NEW_LINE_9297ae3ca7acd568__ echo:*)",
+      "Bash(__NEW_LINE_fa5be91610a8fcb0__ echo:*)",
+      "Bash(__NEW_LINE_2182bbe61f0edee5__ echo:*)",
+      "Bash(__NEW_LINE_51e490198e02245e__ echo:*)"
     ]
   }
 }

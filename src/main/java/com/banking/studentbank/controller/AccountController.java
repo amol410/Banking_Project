@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -73,6 +74,62 @@ public class AccountController {
     public ResponseEntity<TransactionResponse> transfer(@Valid @RequestBody TransferRequest request) {
         TransactionResponse response = accountService.transfer(request);
         return ResponseEntity.ok(response);
+    }
+
+    // Feature 6: Date filter on transactions
+    @GetMapping("/{id}/transactions/filter")
+    @Operation(summary = "Get transactions between two dates")
+    public ResponseEntity<List<TransactionResponse>> getTransactionsByDate(
+            @PathVariable Long id,
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+        java.time.LocalDate start = java.time.LocalDate.parse(startDate);
+        java.time.LocalDate end = java.time.LocalDate.parse(endDate);
+        return ResponseEntity.ok(transactionService.getTransactionsByDateRange(id, start, end));
+    }
+
+    // Feature 11: Interest calculation
+    @GetMapping("/{id}/interest")
+    @Operation(summary = "Calculate interest for a savings account")
+    public ResponseEntity<Map<String, Object>> calculateInterest(@PathVariable Long id) {
+        return ResponseEntity.ok(accountService.calculateInterest(id));
+    }
+
+    // Feature 1: Close Account
+    @PutMapping("/{id}/close")
+    @Operation(summary = "Close (deactivate) an account")
+    public ResponseEntity<AccountResponse> closeAccount(@PathVariable Long id) {
+        return ResponseEntity.ok(accountService.closeAccount(id));
+    }
+
+    // Feature 2: Update Account Holder Name
+    @PutMapping("/{id}/update-name")
+    @Operation(summary = "Update account holder name")
+    public ResponseEntity<AccountResponse> updateName(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateAccountNameRequest request) {
+        return ResponseEntity.ok(accountService.updateAccountName(id, request.getAccountHolderName()));
+    }
+
+    // Feature 3: Get Account by Account Number
+    @GetMapping("/number/{accountNumber}")
+    @Operation(summary = "Get account by account number")
+    public ResponseEntity<AccountResponse> getByAccountNumber(@PathVariable String accountNumber) {
+        return ResponseEntity.ok(accountService.getAccountByNumber(accountNumber));
+    }
+
+    // Feature 4: Search Accounts by Name
+    @GetMapping("/search")
+    @Operation(summary = "Search accounts by holder name")
+    public ResponseEntity<List<AccountResponse>> searchByName(@RequestParam String name) {
+        return ResponseEntity.ok(accountService.searchByName(name));
+    }
+
+    // Feature 5: Mini Statement (last 5 transactions)
+    @GetMapping("/{id}/mini-statement")
+    @Operation(summary = "Get last 5 transactions (mini statement)")
+    public ResponseEntity<List<TransactionResponse>> getMiniStatement(@PathVariable Long id) {
+        return ResponseEntity.ok(transactionService.getMiniStatement(id));
     }
 
     @GetMapping("/{id}/balance")

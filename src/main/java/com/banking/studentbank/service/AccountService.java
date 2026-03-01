@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -94,6 +96,14 @@ public class AccountService {
             throw new InsufficientFundsException(request.getAmount(), account.getBalance());
         }
 
+        // Feature 9: Daily withdrawal limit check
+        BigDecimal todayTotal = transactionService.getTodayWithdrawalTotal(account);
+        if (todayTotal.add(request.getAmount()).compareTo(DAILY_WITHDRAWAL_LIMIT) > 0) {
+            BigDecimal remaining = DAILY_WITHDRAWAL_LIMIT.subtract(todayTotal);
+            throw new InvalidAccountOperationException(
+                "Daily withdrawal limit of " + DAILY_WITHDRAWAL_LIMIT + " exceeded. Remaining limit today: " + remaining);
+        }
+
         account.setBalance(account.getBalance().subtract(request.getAmount()));
         BankAccount saved = bankAccountRepository.save(account);
 
@@ -152,6 +162,76 @@ public class AccountService {
 
         Transaction saved = transactionService.saveTransaction(transaction);
         return transactionService.mapToResponse(saved);
+    }
+
+    // Feature 1: Close Account
+    public AccountResponse closeAccount(Long accountId) {
+        BankAccount account = bankAccountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+
+        if (account.getStatus() == AccountStatus.INACTIVE) {
+            throw new InvalidAccountOperationException("Account is already inactive");
+        }
+
+        account.setStatus(AccountStatus.INACTIVE);
+        return mapToResponse(bankAccountRepository.save(account));
+    }
+
+    // Feature 2: Update Account Holder Name
+    public AccountResponse updateAccountName(Long accountId, String newName) {
+        BankAccount account = bankAccountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+
+        if (newName == null || newName.trim().isEmpty()) {
+            throw new InvalidAccountOperationException("Account holder name cannot be blank");
+        }
+
+        account.setAccountHolderName(newName.trim());
+        return mapToResponse(bankAccountRepository.save(account));
+    }
+
+    // Feature 9: Daily withdrawal limit (max 10,000 per day)
+    private static final BigDecimal DAILY_WITHDRAWAL_LIMIT = new BigDecimal("10000.00");
+
+    // Feature 11: Interest rate for savings accounts (4% per annum)
+    private static final BigDecimal ANNUAL_INTEREST_RATE = new BigDecimal("0.04");
+
+    // Feature 3: Get Account by Account Number (already exists, exposed via controller)
+
+    // Feature 11: Calculate interest for a savings account
+    public Map<String, Object> calculateInterest(Long accountId) {
+        BankAccount account = bankAccountRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+
+        if (account.getAccountType() != AccountType.SAVINGS) {
+            throw new InvalidAccountOperationException("Interest is only applicable for SAVINGS accounts");
+        }
+
+        BigDecimal monthlyInterest = account.getBalance()
+                .multiply(ANNUAL_INTEREST_RATE)
+                .divide(new BigDecimal("12"), 2, RoundingMode.HALF_UP);
+
+        BigDecimal yearlyInterest = account.getBalance()
+                .multiply(ANNUAL_INTEREST_RATE)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("accountId", account.getAccountId());
+        result.put("accountNumber", account.getAccountNumber());
+        result.put("currentBalance", account.getBalance());
+        result.put("annualInterestRate", "4%");
+        result.put("monthlyInterest", monthlyInterest);
+        result.put("yearlyInterest", yearlyInterest);
+        result.put("balanceAfterOneYear", account.getBalance().add(yearlyInterest));
+        return result;
+    }
+
+    // Feature 4: Search Accounts by Name
+    public List<AccountResponse> searchByName(String name) {
+        return bankAccountRepository.findByAccountHolderNameContaining(name)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     private String generateAccountNumber() {
