@@ -2,7 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   getAccount, getBalance, deposit, withdraw, getTransactions,
-  closeAccount, updateName, getMiniStatement
+  closeAccount, updateName, getMiniStatement,
+  getTransactionsByDate, calculateInterest,
+  exportTransactionsCsv
 } from '../../api/accounts';
 import { formatCurrency, formatDate, getErrorMessage } from '../../utils/format';
 import Navbar from '../../components/Navbar';
@@ -11,7 +13,8 @@ import Spinner from '../../components/Spinner';
 import {
   ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight,
   RefreshCw, Clock, ChevronLeft, ChevronRight,
-  CircleDollarSign, Pencil, XCircle, List, Zap
+  CircleDollarSign, Pencil, XCircle, List, Zap,
+  CalendarRange, TrendingUp, Search, X, Download
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -68,7 +71,7 @@ export default function AccountDetail() {
   const [txPage, setTxPage]         = useState(null);
   const [miniTx, setMiniTx]         = useState([]);
   const [page, setPage]             = useState(0);
-  const [txTab, setTxTab]           = useState('full');  // 'full' | 'mini'
+  const [txTab, setTxTab]           = useState('full');  // 'full' | 'mini' | 'filter' | 'interest'
   const [loading, setLoading]       = useState(true);
   const [txLoading, setTxLoading]   = useState(false);
   const [miniLoading, setMiniLoading] = useState(false);
@@ -79,6 +82,43 @@ export default function AccountDetail() {
   const [desc, setDesc]             = useState('');
   const [newNameVal, setNewNameVal] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Group 4 — CSV export
+  const [exportingCsv, setExportingCsv] = useState(false);
+
+  const handleExportTxCsv = async () => {
+    setExportingCsv(true);
+    try {
+      const { data } = await exportTransactionsCsv(id);
+      const url = window.URL.createObjectURL(data);
+      const a   = document.createElement('a');
+      a.href    = url;
+      a.download = `transactions_account_${id}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Transactions CSV downloaded!');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  // Group 3 — date filter
+  const today = new Date().toISOString().split('T')[0];
+  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    .toISOString().split('T')[0];
+  const [startDate, setStartDate]   = useState(firstOfMonth);
+  const [endDate, setEndDate]       = useState(today);
+  const [filteredTx, setFilteredTx] = useState([]);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [filterApplied, setFilterApplied] = useState(false);
+
+  // Group 3 — interest
+  const [interest, setInterest]     = useState(null);
+  const [interestLoading, setInterestLoading] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -119,12 +159,48 @@ export default function AccountDetail() {
     }
   }, [id]);
 
+  // Group 3 — fetch transactions by date range
+  const handleDateFilter = async (e) => {
+    e.preventDefault();
+    if (!startDate || !endDate) { toast.error('Select both start and end dates'); return; }
+    if (startDate > endDate) { toast.error('Start date cannot be after end date'); return; }
+    setFilterLoading(true);
+    setFilterApplied(false);
+    try {
+      const { data } = await getTransactionsByDate(id, startDate, endDate);
+      setFilteredTx(data);
+      setFilterApplied(true);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setFilterLoading(false);
+    }
+  };
+
+  // Group 3 — calculate interest
+  const fetchInterest = useCallback(async () => {
+    setInterestLoading(true);
+    try {
+      const { data } = await calculateInterest(id);
+      setInterest(data);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setInterestLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => { fetchAll(); fetchTx(0); }, [fetchAll, fetchTx]);
 
   // fetch mini when tab is switched to mini
   useEffect(() => {
     if (txTab === 'mini' && miniTx.length === 0) fetchMini();
   }, [txTab, miniTx.length, fetchMini]);
+
+  // fetch interest when tab is switched to interest
+  useEffect(() => {
+    if (txTab === 'interest' && interest === null) fetchInterest();
+  }, [txTab, interest, fetchInterest]);
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
@@ -150,6 +226,7 @@ export default function AccountDetail() {
       setModal(null); setAmount(''); setDesc('');
       fetchAll(); fetchTx(0); setPage(0);
       if (txTab === 'mini') { setMiniTx([]); fetchMini(); }
+      if (txTab === 'interest') { setInterest(null); fetchInterest(); }
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -202,6 +279,7 @@ export default function AccountDetail() {
   const totalPages  = txPage?.totalPages || 0;
   const totalElements = txPage?.totalElements || 0;
   const isActive    = account?.status === 'ACTIVE';
+  const isSavings   = account?.accountType === 'SAVINGS';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -219,7 +297,7 @@ export default function AccountDetail() {
 
         {/* Account Card */}
         <div className={`rounded-2xl p-6 mb-6 text-white shadow-lg
-          ${account?.accountType === 'SAVINGS'
+          ${isSavings
             ? 'bg-gradient-to-br from-blue-600 to-indigo-700'
             : 'bg-gradient-to-br from-violet-600 to-purple-700'}`}
         >
@@ -268,7 +346,7 @@ export default function AccountDetail() {
               </div>
             )}
 
-            {/* Management actions — Group 2 */}
+            {/* Management actions */}
             <div className="flex gap-3">
               <button
                 onClick={() => { setNewNameVal(account?.accountHolderName); setModal('updateName'); }}
@@ -288,43 +366,76 @@ export default function AccountDetail() {
           </div>
         </div>
 
-        {/* Transaction History with tabs */}
+        {/* Transaction / Interest tabs */}
         <div className="card">
           {/* Tab header */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
               <button
                 onClick={() => setTxTab('full')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all
                   ${txTab === 'full' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <List size={14} />
-                All Transactions
+                All
                 {totalElements > 0 && (
-                  <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                  <span className="ml-0.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
                     {totalElements}
                   </span>
                 )}
               </button>
               <button
                 onClick={() => setTxTab('mini')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all
                   ${txTab === 'mini' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <Zap size={14} />
-                Mini Statement
+                Mini
               </button>
+              {/* Group 3 tabs */}
+              <button
+                onClick={() => setTxTab('filter')}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all
+                  ${txTab === 'filter' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <CalendarRange size={14} />
+                By Date
+              </button>
+              {isSavings && (
+                <button
+                  onClick={() => setTxTab('interest')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all
+                    ${txTab === 'interest' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <TrendingUp size={14} />
+                  Interest
+                </button>
+              )}
             </div>
 
-            <button
-              onClick={() => {
-                if (txTab === 'full') { fetchAll(); fetchTx(page); }
-                else { setMiniTx([]); fetchMini(); }
-              }}
-              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-all"
-            >
-              <RefreshCw size={13} /> Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Group 4: Export transactions CSV */}
+              <button
+                onClick={handleExportTxCsv}
+                disabled={exportingCsv}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                title="Export transactions to CSV"
+              >
+                {exportingCsv ? <Spinner size="sm" color="gray" /> : <Download size={13} />}
+                CSV
+              </button>
+              <button
+                onClick={() => {
+                  if (txTab === 'full') { fetchAll(); fetchTx(page); }
+                  else if (txTab === 'mini') { setMiniTx([]); fetchMini(); }
+                  else if (txTab === 'filter') { setFilterApplied(false); setFilteredTx([]); }
+                  else if (txTab === 'interest') { setInterest(null); fetchInterest(); }
+                }}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-all"
+              >
+                <RefreshCw size={13} /> Refresh
+              </button>
+            </div>
           </div>
 
           {/* Full transaction history */}
@@ -372,7 +483,7 @@ export default function AccountDetail() {
             </>
           )}
 
-          {/* Mini Statement — last 5 (Group 2) */}
+          {/* Mini Statement */}
           {txTab === 'mini' && (
             <>
               {miniLoading ? (
@@ -400,6 +511,170 @@ export default function AccountDetail() {
                 </div>
               )}
             </>
+          )}
+
+          {/* Date Filter — Group 3 */}
+          {txTab === 'filter' && (
+            <div>
+              <form onSubmit={handleDateFilter} className="bg-gray-50 rounded-xl p-4 mb-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Filter transactions by date range
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Start Date</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={startDate}
+                      max={today}
+                      onChange={(e) => { setStartDate(e.target.value); setFilterApplied(false); }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">End Date</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={endDate}
+                      max={today}
+                      onChange={(e) => { setEndDate(e.target.value); setFilterApplied(false); }}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={filterLoading}
+                    className="btn-primary flex items-center gap-2">
+                    {filterLoading
+                      ? <Spinner size="sm" color="white" />
+                      : <><Search size={14} /> Search</>}
+                  </button>
+                  {filterApplied && (
+                    <button type="button"
+                      onClick={() => { setFilterApplied(false); setFilteredTx([]); }}
+                      className="btn-secondary flex items-center gap-1.5">
+                      <X size={14} /> Clear
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              {filterLoading ? (
+                <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
+              ) : filterApplied ? (
+                filteredTx.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                      <CalendarRange size={24} className="text-gray-400" />
+                    </div>
+                    <p className="text-gray-500 font-medium text-sm">No transactions in this date range</p>
+                    <p className="text-gray-400 text-xs mt-1">{startDate} → {endDate}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs text-gray-500 font-medium">
+                        {filteredTx.length} transaction{filteredTx.length !== 1 ? 's' : ''} found
+                      </p>
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+                        {startDate} → {endDate}
+                      </span>
+                    </div>
+                    {filteredTx.map((tx) => (
+                      <TxRow key={tx.transactionId} tx={tx} accountId={id} />
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-10">
+                  <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <CalendarRange size={24} className="text-blue-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm font-medium">Select a date range and click Search</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Interest Calculator — Group 3 (SAVINGS only) */}
+          {txTab === 'interest' && (
+            <div>
+              {interestLoading ? (
+                <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
+              ) : interest ? (
+                <div className="space-y-4">
+                  {/* Header */}
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                        <TrendingUp size={20} className="text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Interest Projection</p>
+                        <p className="text-xs text-gray-500">Annual rate: {interest.annualInterestRatePercent ?? interest.interestRate ?? '4'}%</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white rounded-xl p-4 shadow-sm">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Monthly</p>
+                        <p className="text-xl font-bold text-emerald-600">
+                          {formatCurrency(interest.monthlyInterest ?? interest.monthly ?? 0)}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">per month</p>
+                      </div>
+                      <div className="bg-white rounded-xl p-4 shadow-sm">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Yearly</p>
+                        <p className="text-xl font-bold text-blue-600">
+                          {formatCurrency(interest.yearlyInterest ?? interest.yearly ?? 0)}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">per year</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Calculation Details</p>
+                    {[
+                      { label: 'Current Balance', value: formatCurrency(interest.principal ?? balance) },
+                      { label: 'Annual Rate', value: `${interest.annualInterestRatePercent ?? interest.interestRate ?? '4'}%` },
+                      { label: 'Monthly Interest', value: formatCurrency(interest.monthlyInterest ?? interest.monthly ?? 0) },
+                      { label: 'Yearly Interest', value: formatCurrency(interest.yearlyInterest ?? interest.yearly ?? 0) },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">{label}</span>
+                        <span className="font-semibold text-gray-800">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                    <span className="text-amber-500 text-base leading-none mt-0.5">ℹ</span>
+                    <p className="text-xs text-amber-700">
+                      Interest is calculated on the current balance. Actual credited amount may vary based on bank policy and account activity.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => { setInterest(null); fetchInterest(); }}
+                    className="btn-secondary w-full flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={14} /> Recalculate
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-10">
+                  <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                    <TrendingUp size={24} className="text-emerald-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm font-medium mb-4">Calculate interest on your savings</p>
+                  <button onClick={fetchInterest} className="btn-primary inline-flex items-center gap-2">
+                    <TrendingUp size={15} /> Calculate Interest
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -476,7 +751,7 @@ export default function AccountDetail() {
         </form>
       </Modal>
 
-      {/* Update Name Modal — Group 2 */}
+      {/* Update Name Modal */}
       <Modal isOpen={modal === 'updateName'} onClose={() => setModal(null)} title="Update Account Name">
         <form onSubmit={handleUpdateName} className="space-y-4">
           <div>
@@ -501,7 +776,7 @@ export default function AccountDetail() {
         </form>
       </Modal>
 
-      {/* Close Account Confirmation Modal — Group 2 */}
+      {/* Close Account Confirmation Modal */}
       <Modal isOpen={modal === 'close'} onClose={() => setModal(null)} title="Close Account">
         <div className="space-y-4">
           <div className="bg-red-50 border border-red-200 rounded-xl p-4">

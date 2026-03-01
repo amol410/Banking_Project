@@ -2,7 +2,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, ArrowLeftRight, LogOut,
-  Landmark, User, ChevronDown
+  Landmark, User, ChevronDown, UserCircle
 } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -81,6 +81,14 @@ export default function Navbar() {
                   <p className="text-sm font-semibold text-gray-800">{user?.username}</p>
                   <p className="text-xs text-gray-400">{user?.role}</p>
                 </div>
+                <Link
+                  to="/profile"
+                  onClick={() => setDropOpen(false)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <UserCircle size={15} />
+                  My Profile
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
